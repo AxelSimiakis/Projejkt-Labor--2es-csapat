@@ -1,0 +1,12 @@
+# Virtuális környezet
+venv/
+
+# Python Fejlesztői környezet fájljai
+__pycache__/
+*.pyc
+
+# Adatbázis fájlok
+*.db
+# Fejlesztői környezet fájljai
+.idea/
+.vscode/
