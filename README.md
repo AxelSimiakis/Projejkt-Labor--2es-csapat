@@ -65,6 +65,10 @@ venv\Scripts\activate
 
 pip install -r requirements.txt
 
+### Adtabázis törlése
+
+töröld a trailer_rental.db fájlt
+
 ### Minta adatok betöltése
 
 python -m seed.seed_users
