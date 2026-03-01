@@ -1,48 +1,23 @@
-"""
-services/auth_service.py
-------------------------
-Autentikációs service (stub).
-
-
-Most: demo belépés
-- admin@potkocsipont.hu / 1234
-"""
-
-from __future__ import annotations
-
-from dataclasses import dataclass
-
-
-@dataclass(frozen=True)
-class AuthResult:
-    """Egységes eredmény objektum a belépéshez."""
-    success: bool
-    message: str
+import bcrypt
+from database import SessionLocal
+from models import User
 
 
 class AuthService:
-    """
-    Backend-hez csatlakozó autentikációs réteg (stub).
-    """
 
-    def authenticate(self, email: str, password: str) -> AuthResult:
-        """
-        Email/jelszó ellenőrzés (demo).
-        """
-        email = (email or "").strip()
+    @staticmethod
+    def login(email: str, password: str):
+        session = SessionLocal()
 
-        if not email or not password:
-            return AuthResult(False, "Kérlek add meg az email címet és a jelszót!")
+        user = session.query(User).filter_by(email=email).first()
 
-        # Demo felhasználó (később backendből jön)
-        if email.lower() == "admin@potkocsipont.hu" and password == "1234":
-            return AuthResult(True, "Sikeres belépés!")
+        if not user:
+            session.close()
+            return False, None
 
-        return AuthResult(False, "Hibás email vagy jelszó!")
+        if bcrypt.checkpw(password.encode(), user.password_hash.encode()):
+            session.close()
+            return True, user
 
-    def authenticate_with_google(self) -> AuthResult:
-        """
-        Google belépés stub.
-        Ide jöhet OAuth flow (webview/redirect/token).
-        """
-        return AuthResult(True, "Google belépés (demo) sikeres!")
+        session.close()
+        return False, None
