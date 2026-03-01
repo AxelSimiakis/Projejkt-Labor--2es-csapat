@@ -1,15 +1,21 @@
 import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from models.base import Base
 
 # Adatbázis fájl elérési út stabilizálása
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'trailer_rental.db')}"
+DATABASE_URL = "sqlite:///./trailer_rental.db"
 
-engine = create_engine(DATABASE_URL, echo=True)
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False}
+)
 
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
     bind=engine
 )
+
+Base.metadata.create_all(bind=engine)

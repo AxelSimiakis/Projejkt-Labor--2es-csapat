@@ -1,21 +1,29 @@
 from sqlalchemy import Column, Integer, String, DateTime
-from datetime import datetime
-from .base import Base
+from sqlalchemy.sql import func
+from models.base import Base
+
 
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, nullable=False)
-    password_hash = Column(String, nullable=False)
 
-    first_name = Column(String, nullable=False)
-    last_name = Column(String, nullable=False)
+    email = Column(String, unique=True, index=True)
+    password_hash = Column(String)
 
+    first_name = Column(String)
+    last_name = Column(String)
     phone = Column(String)
-    address = Column(String)
+
+    # ===== ÚJ CÍM MEZŐK =====
+    country = Column(String)
+    zip_code = Column(String)
+    city = Column(String)
+    street = Column(String)
+    house_number = Column(String)
+
     profile_image_path = Column(String)
 
-    role = Column(String, nullable=False, default="user")
+    role = Column(String, default="user")
 
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -52,6 +52,10 @@ Megvalósított elemek:
 
 ## Futatási útmutató
 
+### 0. Virtuális Környzet
+
+python -m venv venv
+
 ### 1. Virtuális környezet aktiválása
 
 venv\Scripts\activate
@@ -61,18 +65,9 @@ venv\Scripts\activate
 
 pip install -r requirements.txt
 
-
-### Migráció futtatása
-
-alembic upgrade head
-
-
 ### Minta adatok betöltése
 
-python seed/seed_users.py
-python seed/seed_trailers.py
-python seed/seed_bookings.py
-
+python -m seed.seed_users
 
 ### Alkalmazások indítása
 

@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel,
-    QLineEdit, QPushButton, QMessageBox
+    QLineEdit, QPushButton, QMessageBox,
+    QFrame
 )
 from PySide6.QtCore import Qt
 
@@ -12,93 +13,86 @@ class LoginView(QWidget):
 
     def __init__(self, main_window):
         super().__init__()
-
         self.main_window = main_window
-        self.viewmodel = LoginViewModel()
+        self.vm = LoginViewModel()
 
-        self.setMinimumWidth(350)
+        outer_layout = QVBoxLayout()
+        outer_layout.addStretch()
+
+        # ===== KÁRTYA PANEL =====
+        self.card = QFrame()
+        self.card.setFixedWidth(400)
+        self.card.setStyleSheet("""
+            QFrame {
+                background-color: #1f2937;
+                border-radius: 12px;
+                padding: 25px;
+            }
+
+            QLineEdit {
+                padding: 8px;
+                border-radius: 6px;
+                border: 1px solid #ccc;
+            }
+
+            QPushButton#mainButton {
+                background-color: #16a34a;
+                color: white;
+                padding: 10px;
+                border-radius: 8px;
+                font-weight: bold;
+            }
+
+            QPushButton#mainButton:hover {
+                background-color: #15803d;
+            }
+        """)
 
         layout = QVBoxLayout()
-        layout.setAlignment(Qt.AlignCenter)
         layout.setSpacing(15)
 
         title = QLabel("Bejelentkezés")
         title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("font-size: 22px; font-weight: bold;")
+        title.setStyleSheet("font-size: 20px; font-weight: bold;")
 
-        self.email_input = QLineEdit()
-        self.email_input.setPlaceholderText("Email")
+        self.email = QLineEdit()
+        self.email.setPlaceholderText("Email")
 
-        self.password_input = QLineEdit()
-        self.password_input.setPlaceholderText("Jelszó")
-        self.password_input.setEchoMode(QLineEdit.Password)
+        self.password = QLineEdit()
+        self.password.setPlaceholderText("Jelszó")
+        self.password.setEchoMode(QLineEdit.Password)
 
-        login_button = QPushButton("Belépés")
-        login_button.clicked.connect(self.handle_login)
+        login_btn = QPushButton("Belépés")
+        login_btn.setObjectName("mainButton")
+        login_btn.clicked.connect(self.handle_login)
 
         layout.addWidget(title)
-        layout.addWidget(self.email_input)
-        layout.addWidget(self.password_input)
-        layout.addWidget(login_button)
+        layout.addWidget(self.email)
+        layout.addWidget(self.password)
+        layout.addSpacing(10)
+        layout.addWidget(login_btn)
 
-        self.setLayout(layout)
+        self.card.setLayout(layout)
 
-        self.setStyleSheet("""
-            QLineEdit {
-                padding: 8px;
-                border-radius: 5px;
-                border: 1px solid #ccc;
-            }
-            QPushButton {
-                background-color: #10a64a;
-                color: white;
-                padding: 8px;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #0d8a3e;
-            }
-        """)
+        outer_layout.addWidget(self.card, alignment=Qt.AlignCenter)
+        outer_layout.addStretch()
 
-    # =========================
+        self.setLayout(outer_layout)
+
+    # =====================
     # LOGIN LOGIKA
-    # =========================
+    # =====================
     def handle_login(self):
 
-        email = self.email_input.text().strip()
-        password = self.password_input.text().strip()
-
-        if not email or not password:
-            QMessageBox.warning(self, "Hiba", "Minden mező kitöltése kötelező!")
-            return
-
-        success, user = self.viewmodel.login(email, password)
+        success, user = self.vm.login(
+            self.email.text(),
+            self.password.text()
+        )
 
         if success:
-            # Session mentés
             SessionManager.instance().login(user)
-
-            QMessageBox.information(
-                self,
-                "Siker",
-                f"Sikeres bejelentkezés!\nSzerepkör: {user.role}"
-            )
-
-            # Navbar frissítés
+            QMessageBox.information(self, "Siker", "Sikeres bejelentkezés!")
             self.main_window.update_navbar()
-
-            # Vissza főoldalra
-            self.main_window.stack.setCurrentWidget(
-                self.main_window.home_page
-            )
-
-            # Mezők ürítése
-            self.email_input.clear()
-            self.password_input.clear()
-
+            self.main_window.stack.setCurrentIndex(0)
         else:
-            QMessageBox.warning(
-                self,
-                "Hiba",
-                "Hibás email vagy jelszó!"
-            )
+            QMessageBox.warning(self, "Hiba", "Hibás email vagy jelszó!")
