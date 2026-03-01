@@ -1,13 +1,13 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel,
-    QLineEdit, QPushButton, QMessageBox,
+    QLineEdit, QPushButton,
     QFrame
 )
 from PySide6.QtCore import Qt
 
 from viewmodels.login_vm import LoginViewModel
 from core.session_manager import SessionManager
-
+from core.toast import Toast
 
 class LoginView(QWidget):
 
@@ -91,8 +91,11 @@ class LoginView(QWidget):
 
         if success:
             SessionManager.instance().login(user)
-            QMessageBox.information(self, "Siker", "Sikeres bejelentkezés!")
+            toast = Toast(self.main_window, "Sikeres bejelentkezés!", success=True)
+            toast.show_toast()
+
             self.main_window.update_navbar()
             self.main_window.stack.setCurrentIndex(0)
         else:
-            QMessageBox.warning(self, "Hiba", "Hibás email vagy jelszó!")
+            toast = Toast(self.main_window, "Hibás email vagy jelszó!", success=False)
+            toast.show_toast()

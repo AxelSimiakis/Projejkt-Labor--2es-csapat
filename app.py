@@ -13,6 +13,7 @@ from views.register_view import RegisterView
 from views.profile_view import ProfileView
 from core.session_manager import SessionManager
 from core.image_utils import create_round_avatar
+from core.toast import Toast
 
 
 class MainWindow(QMainWindow):
@@ -156,7 +157,7 @@ class MainWindow(QMainWindow):
             avatar_btn.setCursor(Qt.PointingHandCursor)
             avatar_btn.setStyleSheet("""
                 border-radius: 20px;
-                border: 2px solid white;
+                border: none;
             """)
             avatar_btn.clicked.connect(self.open_profile)
 

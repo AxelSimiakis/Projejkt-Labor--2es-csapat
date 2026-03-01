@@ -1,12 +1,13 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLineEdit,
-    QPushButton, QLabel, QFileDialog, QMessageBox
+    QPushButton, QLabel, QFileDialog
 )
 from PySide6.QtCore import Qt
 from database import SessionLocal
 from models.user import User
 from passlib.hash import bcrypt
 from core.image_utils import create_round_avatar
+from core.toast import Toast
 
 
 class RegisterView(QWidget):
@@ -110,11 +111,13 @@ class RegisterView(QWidget):
 
     def register_user(self):
         if not self.email.text().strip():
-            QMessageBox.warning(self, "Hiba", "Az email megadása kötelező!")
+            toast = Toast(self.main_window, "Az email megadása kötelező!", success=False)
+            toast.show_toast()
             return
 
         if not self.password.text().strip():
-            QMessageBox.warning(self, "Hiba", "A jelszó megadása kötelező!")
+            toast = Toast(self.main_window, "A jelszó megadása kötelező!", success=False)
+            toast.show_toast()
             return
 
         session = SessionLocal()
@@ -125,7 +128,8 @@ class RegisterView(QWidget):
         ).first()
 
         if existing_user:
-            QMessageBox.warning(self, "Hiba", "Ez az email már regisztrálva van!")
+            toast = Toast(self.main_window, "Az email már létezik!", success=False)
+            toast.show_toast()
             session.close()
             return
 
@@ -148,5 +152,31 @@ class RegisterView(QWidget):
         session.commit()
         session.close()
 
-        QMessageBox.information(self, "Siker", "Sikeres regisztráció!")
-        self.main_window.update_navbar()
+        saved_email = self.email.text().strip()
+
+        toast = Toast(self.main_window, "Sikeres regisztráció!", success=True)
+        toast.show_toast()
+
+        # Átváltás login oldalra
+        self.main_window.stack.setCurrentWidget(self.main_window.login_page)
+
+        # Email automatikus kitöltése login mezőben
+        self.main_window.login_page.email.setText(saved_email)
+
+        # Jelszó mező ürítése biztonság miatt
+        self.main_window.login_page.password.clear()
+
+
+        # Űrlap törlése
+        self.first_name.clear()
+        self.last_name.clear()
+        self.email.clear()
+        self.password.clear()
+        self.phone.clear()
+        self.country.clear()
+        self.zip_code.clear()
+        self.city.clear()
+        self.street.clear()
+        self.house_number.clear()
+        self.avatar_preview.clear()
+        self.avatar_path = None
