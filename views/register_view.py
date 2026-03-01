@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLineEdit,
-    QPushButton, QLabel, QFileDialog
+    QPushButton, QLabel, QFileDialog, QMessageBox
 )
 from PySide6.QtCore import Qt
 from database import SessionLocal
@@ -109,19 +109,37 @@ class RegisterView(QWidget):
             self.avatar_preview.setPixmap(avatar)
 
     def register_user(self):
+        if not self.email.text().strip():
+            QMessageBox.warning(self, "Hiba", "Az email megadása kötelező!")
+            return
+
+        if not self.password.text().strip():
+            QMessageBox.warning(self, "Hiba", "A jelszó megadása kötelező!")
+            return
+
         session = SessionLocal()
 
+        # EMAIL ELLENŐRZÉS
+        existing_user = session.query(User).filter_by(
+            email=self.email.text().strip()
+        ).first()
+
+        if existing_user:
+            QMessageBox.warning(self, "Hiba", "Ez az email már regisztrálva van!")
+            session.close()
+            return
+
         user = User(
-            first_name=self.first_name.text(),
-            last_name=self.last_name.text(),
-            email=self.email.text(),
+            first_name=self.first_name.text().strip(),
+            last_name=self.last_name.text().strip(),
+            email=self.email.text().strip(),
             password_hash=bcrypt.hash(self.password.text()),
-            phone=self.phone.text(),
-            country=self.country.text(),
-            zip_code=self.zip_code.text(),
-            city=self.city.text(),
-            street=self.street.text(),
-            house_number=self.house_number.text(),
+            phone=self.phone.text().strip(),
+            country=self.country.text().strip(),
+            zip_code=self.zip_code.text().strip(),
+            city=self.city.text().strip(),
+            street=self.street.text().strip(),
+            house_number=self.house_number.text().strip(),
             profile_image_path=self.avatar_path,
             role="user"
         )
@@ -130,4 +148,5 @@ class RegisterView(QWidget):
         session.commit()
         session.close()
 
+        QMessageBox.information(self, "Siker", "Sikeres regisztráció!")
         self.main_window.update_navbar()
