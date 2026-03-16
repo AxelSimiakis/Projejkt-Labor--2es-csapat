@@ -78,3 +78,5 @@ class Toast(QWidget):
         self.fade_out.setEndValue(0)
         self.fade_out.finished.connect(self.close)
         self.fade_out.start()
+
+        

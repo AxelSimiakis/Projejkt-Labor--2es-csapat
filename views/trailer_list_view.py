@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.session_manager import SessionManager
+from core.toast import Toast
 from services.booking_service import (
     create_booking,
     get_availability_for_trailer_and_date,
@@ -296,11 +297,9 @@ class TrailerListView(QWidget):
             right_layout.addWidget(label)
 
         self.period_combo = QComboBox()
-
         self.period_combo.addItem("Délelőtt", "morning")
         self.period_combo.addItem("Délután", "afternoon")
         self.period_combo.addItem("Egész nap", "full_day")
-
         self.period_combo.setStyleSheet("""
             QComboBox {
                 background-color: #111827;
@@ -483,12 +482,14 @@ class TrailerListView(QWidget):
 
     def book_selected_trailer(self):
         if self.selected_trailer is None:
-            QMessageBox.warning(self, "Hiba", "Először válassz utánfutót.")
+            toast = Toast(self.main_window or self, "Először válassz utánfutót.", success=False)
+            toast.show_toast()
             return
 
         user = SessionManager.instance().get_user()
         if not user:
-            QMessageBox.warning(self, "Hiba", "Foglaláshoz be kell jelentkezni.")
+            toast = Toast(self.main_window or self, "Foglaláshoz be kell jelentkezni.", success=False)
+            toast.show_toast()
             return
 
         booking_date = self.get_selected_booking_date()
@@ -496,10 +497,21 @@ class TrailerListView(QWidget):
 
         try:
             create_booking(user.id, self.selected_trailer.id, booking_date, period)
-            QMessageBox.information(self, "Siker", "A foglalás sikeresen létrejött.")
+
             self.refresh_calendar_month(booking_date.year, booking_date.month)
             self.refresh_day_availability()
+
+            toast = Toast(
+                self.main_window or self,
+                f"Sikeres foglalás: {self.selected_trailer.name} - {booking_date.strftime('%Y.%m.%d.')}",
+                success=True
+            )
+            toast.show_toast()
+
         except ValueError as exc:
-            QMessageBox.warning(self, "Hiba", str(exc))
+            toast = Toast(self.main_window or self, str(exc), success=False)
+            toast.show_toast()
+
         except Exception as exc:
-            QMessageBox.critical(self, "Hiba", f"Váratlan hiba történt: {exc}")
+            toast = Toast(self.main_window or self, f"Váratlan hiba történt: {exc}", success=False)
+            toast.show_toast()
