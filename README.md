@@ -72,6 +72,8 @@ töröld a trailer_rental.db fájlt
 ### Minta adatok betöltése
 
 python -m seed.seed_users
+python -m seed.seed_trailers
+python -m seed.seed_bookings
 
 ### Alkalmazások indítása
 

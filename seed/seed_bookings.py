@@ -47,9 +47,9 @@ def run():
         user = session.query(User).filter_by(email="user1@test.hu").first()
         employee = session.query(User).filter_by(email="employee@rental.hu").first()
 
-        trailer_wf1 = session.query(Trailer).filter_by(name="WF1").first()
-        trailer_wf3 = session.query(Trailer).filter_by(name="WF3").first()
-        trailer_auto1 = session.query(Trailer).filter_by(name="AUTO1").first()
+        trailer_wf1 = session.query(Trailer).filter_by(name="Nyitott utánfutó").first()
+        trailer_wf2 = session.query(Trailer).filter_by(name="Kerékpár szállító").first()
+        trailer_wf3 = session.query(Trailer).filter_by(name="Egytengelyes").first()
 
         if not user:
             print("Hiányzik a user1@test.hu felhasználó. Futtasd előbb: python seed/seed_users.py")
@@ -59,7 +59,7 @@ def run():
             print("Hiányzik az employee@rental.hu felhasználó. Futtasd előbb: python seed/seed_users.py")
             return
 
-        if not trailer_wf1 or not trailer_wf3 or not trailer_auto1:
+        if not trailer_wf1 or not trailer_wf2 or not trailer_wf3:
             print("Hiányzó trailer adatok. Futtasd előbb: python seed/seed_trailers.py")
             return
 
@@ -75,7 +75,7 @@ def run():
         create_booking_if_not_exists(
             session,
             user_id=user.id,
-            trailer_id=trailer_wf3.id,
+            trailer_id=trailer_wf2.id,
             booking_date=date.today() + timedelta(days=1),
             period="afternoon",
             status="active",
@@ -84,7 +84,7 @@ def run():
         create_booking_if_not_exists(
             session,
             user_id=employee.id,
-            trailer_id=trailer_auto1.id,
+            trailer_id=trailer_wf3.id,
             booking_date=date.today() + timedelta(days=2),
             period="full_day",
             status="technical",

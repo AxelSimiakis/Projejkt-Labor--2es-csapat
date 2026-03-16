@@ -38,8 +38,8 @@ def run():
     try:
         create_or_update_trailer(
             session,
-            name="WF1",
-            description="300x150 cm, 750 kg, általános célú nyitott utánfutó",
+            name="Motorszállító",
+            description="250x160 cm, 750 kg, általános célú nyitott utánfutó",
             length_cm=300,
             width_cm=150,
             max_weight=450,
@@ -49,12 +49,12 @@ def run():
             deposit=40000,
             late_fee=5000,
             is_active=True,
-            image_path="assets/trailers/wf1.jpg",
+            image_path="assets/trailers/motorszállító.jpg",
         )
 
         create_or_update_trailer(
             session,
-            name="WF3",
+            name="Nyitott utánfutó",
             description="205x122 cm, 750 kg, kisebb szállításokhoz ideális",
             length_cm=205,
             width_cm=122,
@@ -65,13 +65,13 @@ def run():
             deposit=40000,
             late_fee=4000,
             is_active=True,
-            image_path="assets/trailers/wf3.jpg",
+            image_path="assets/trailers/sárganyitott.jpg",
         )
 
         create_or_update_trailer(
             session,
-            name="AUTO1",
-            description="Autószállító utánfutó, rámpával",
+            name="Kerékpár szállító",
+            description="Kerékpár utánfutó, rámpával",
             length_cm=450,
             width_cm=210,
             max_weight=2000,
@@ -81,13 +81,13 @@ def run():
             deposit=80000,
             late_fee=12000,
             is_active=True,
-            image_path="assets/trailers/auto1.jpg",
+            image_path="assets/trailers/kerekpar.jpg",
         )
 
         create_or_update_trailer(
             session,
-            name="MAGAS1",
-            description="Magasított oldalfalú utánfutó költözéshez",
+            name="Egytengelyes",
+            description="Egytengelyes utánfutó",
             length_cm=320,
             width_cm=160,
             max_weight=900,
@@ -97,7 +97,7 @@ def run():
             deposit=50000,
             late_fee=6500,
             is_active=True,
-            image_path="assets/trailers/magas1.jpg",
+            image_path="assets/trailers/egytengelyes.jpg",
         )
 
         session.commit()
