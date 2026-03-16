@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from .base import Base
 
+
 class Booking(Base):
     __tablename__ = "bookings"
 
@@ -13,8 +14,8 @@ class Booking(Base):
 
     booking_date = Column(Date, nullable=False)
 
-    period = Column(String, nullable=False)  
-    # morning / afternoon / full_day
+    period = Column(String, nullable=False)
+    # elfogadott értékek: morning / afternoon / full_day
 
     status = Column(String, nullable=False, default="active")
     # active / completed / cancelled / technical

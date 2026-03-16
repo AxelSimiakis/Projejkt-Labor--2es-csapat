@@ -7,10 +7,10 @@ from PySide6.QtCore import Qt
 
 
 class HomeView(QWidget):
-    def __init__(self):
+    def __init__(self, main_window=None):
         super().__init__()
+        self.main_window = main_window
 
-        # --- Színek (maradnak a jelenlegi zöld + szürke árnyalatok) ---
         self.colors = {
             "bg": "#5b5b5b",
             "card": "#4b4b4b",
@@ -35,7 +35,6 @@ class HomeView(QWidget):
         root = QVBoxLayout(content)
         root.setContentsMargins(0, 40, 0, 40)
 
-        # középre igazított konténer
         row = QHBoxLayout()
         row.addItem(QSpacerItem(10, 10, QSizePolicy.Expanding, QSizePolicy.Minimum))
 
@@ -52,17 +51,13 @@ class HomeView(QWidget):
         scroll.setWidget(content)
         outer.addWidget(scroll)
 
-        # =====================================================
-        # HERO SZEKCIÓ
-        # =====================================================
-
         hero = QWidget()
         hero_layout = QVBoxLayout(hero)
         hero_layout.setSpacing(16)
 
         title = QLabel("Pótkocsi kölcsönzés")
         title.setStyleSheet(f"""
-            color: {self.colors["text"]};
+            color: {self.colors['text']};
             font-size: 34px;
             font-weight: 800;
             text-align: center;
@@ -74,7 +69,7 @@ class HomeView(QWidget):
         )
         subtitle.setWordWrap(True)
         subtitle.setStyleSheet(f"""
-            color: {self.colors["muted"]};
+            color: {self.colors['muted']};
             font-size: 15px;
         """)
 
@@ -83,7 +78,7 @@ class HomeView(QWidget):
         cta.setFixedHeight(42)
         cta.setStyleSheet(f"""
             QPushButton {{
-                background-color: {self.colors["primary"]};
+                background-color: {self.colors['primary']};
                 color: white;
                 border: none;
                 border-radius: 8px;
@@ -94,6 +89,8 @@ class HomeView(QWidget):
                 background-color: #1db954;
             }}
         """)
+        if self.main_window:
+            cta.clicked.connect(self.main_window.go_to_trailers)
 
         hero_layout.addWidget(title)
         hero_layout.addWidget(subtitle)
@@ -102,24 +99,15 @@ class HomeView(QWidget):
 
         container_layout.addWidget(hero)
 
-        # =====================================================
-        # HIGHLIGHT BOXOK (3 egy sorban)
-        # =====================================================
-
         highlight_grid = QGridLayout()
         highlight_grid.setHorizontalSpacing(20)
 
         highlight_grid.addWidget(
-            self.create_info_box("🚚", "Többféle pótkocsi",
-                                 "Különböző méretű és típusú utánfutók egy helyen."), 0, 0)
-
+            self.create_info_box("🚚", "Többféle pótkocsi", "Különböző méretű és típusú utánfutók egy helyen."), 0, 0)
         highlight_grid.addWidget(
-            self.create_info_box("🕒", "Gyors ügyintézés",
-                                 "Egyszerű foglalási és adminisztrációs rendszer."), 0, 1)
-
+            self.create_info_box("🕒", "Gyors ügyintézés", "Egyszerű foglalási és adminisztrációs rendszer."), 0, 1)
         highlight_grid.addWidget(
-            self.create_info_box("✅", "Átlátható működés",
-                                 "Követhető bérlési adatok és stabil rendszer."), 0, 2)
+            self.create_info_box("✅", "Átlátható működés", "Követhető bérlési adatok és stabil rendszer."), 0, 2)
 
         highlight_grid.setColumnStretch(0, 1)
         highlight_grid.setColumnStretch(1, 1)
@@ -127,58 +115,39 @@ class HomeView(QWidget):
 
         container_layout.addLayout(highlight_grid)
 
-        # =====================================================
-        # SZOLGÁLTATÁSOK (3 kép kártya)
-        # =====================================================
-
         section_title = QLabel("Szolgáltatásaink")
         section_title.setStyleSheet(f"""
-            color: {self.colors["text"]};
+            color: {self.colors['text']};
             font-size: 20px;
             font-weight: 700;
         """)
-
         container_layout.addWidget(section_title)
 
         image_grid = QGridLayout()
         image_grid.setHorizontalSpacing(20)
-
-        image_grid.addWidget(
-            self.create_image_card("assets/kulonbozo_meretu_utanfutok.png", "Különböző méretű utánfutók"), 0, 0)
-        image_grid.addWidget(
-            self.create_image_card("assets/biztonsagos_kolcsonzes.png", "Biztonságos kölcsönzés"), 0, 1)
-        image_grid.addWidget(
-            self.create_image_card("assets/gyors_atvetel.png", "Gyors átvétel"), 0, 2)
+        image_grid.addWidget(self.create_image_card("assets/kulonbozo_meretu_utanfutok.png", "Különböző méretű utánfutók"), 0, 0)
+        image_grid.addWidget(self.create_image_card("assets/biztonsagos_kolcsonzes.png", "Biztonságos kölcsönzés"), 0, 1)
+        image_grid.addWidget(self.create_image_card("assets/gyors_atvetel.png", "Gyors átvétel"), 0, 2)
 
         image_grid.setColumnStretch(0, 1)
         image_grid.setColumnStretch(1, 1)
         image_grid.setColumnStretch(2, 1)
-
         container_layout.addLayout(image_grid)
-
-        # =====================================================
-        # FOOTER
-        # =====================================================
 
         footer = QLabel("© 2026 PótkocsiPont – Modern pótkocsi kölcsönzés")
         footer.setAlignment(Qt.AlignCenter)
         footer.setStyleSheet(f"""
-            color: {self.colors["muted"]};
+            color: {self.colors['muted']};
             font-size: 12px;
             margin-top: 40px;
         """)
-
         container_layout.addWidget(footer)
-
-    # =====================================================
-    # KOMPONENSEK
-    # =====================================================
 
     def create_info_box(self, icon, title, text):
         box = QFrame()
         box.setStyleSheet(f"""
             QFrame {{
-                background-color: {self.colors["card"]};
+                background-color: {self.colors['card']};
                 border-radius: 10px;
                 padding: 20px;
             }}
@@ -196,7 +165,7 @@ class HomeView(QWidget):
         title_label = QLabel(title)
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet(f"""
-            color: {self.colors["text"]};
+            color: {self.colors['text']};
             font-size: 16px;
             font-weight: 700;
         """)
@@ -206,7 +175,7 @@ class HomeView(QWidget):
         text_label.setAlignment(Qt.AlignCenter)
         text_label.setWordWrap(True)
         text_label.setStyleSheet(f"""
-            color: {self.colors["muted"]};
+            color: {self.colors['muted']};
             font-size: 13px;
         """)
         layout.addWidget(text_label)
@@ -217,40 +186,31 @@ class HomeView(QWidget):
         card = QFrame()
         card.setStyleSheet(f"""
             QFrame {{
-                background-color: {self.colors["card"]};
+                background-color: {self.colors['card']};
                 border-radius: 10px;
-                padding: 14px;
+                padding: 12px;
             }}
         """)
 
         layout = QVBoxLayout(card)
-        layout.setSpacing(12)
-        layout.setAlignment(Qt.AlignCenter)
+        layout.setSpacing(10)
 
-        image = QLabel()
-        image.setMinimumHeight(140)
-        image.setAlignment(Qt.AlignCenter)
+        img = QLabel()
+        pixmap = QPixmap(path)
+        if not pixmap.isNull():
+            img.setPixmap(pixmap.scaled(260, 160, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+        img.setFixedHeight(160)
+        img.setAlignment(Qt.AlignCenter)
+        img.setStyleSheet("border-radius: 8px;")
 
-        pix = QPixmap(path)
-        if not pix.isNull():
-            image.setPixmap(pix.scaled(
-                400, 200,
-                Qt.KeepAspectRatioByExpanding,
-                Qt.SmoothTransformation
-            ))
-        else:
-            image.setText("Kép helye")
-            image.setStyleSheet(f"color:{self.colors['muted']};")
-
-        layout.addWidget(image)
-
-        caption_label = QLabel(caption)
-        caption_label.setAlignment(Qt.AlignCenter)
-        caption_label.setStyleSheet(f"""
-            color: {self.colors["text"]};
-            font-size: 13px;
+        text = QLabel(caption)
+        text.setAlignment(Qt.AlignCenter)
+        text.setStyleSheet(f"""
+            color: {self.colors['text']};
+            font-size: 14px;
             font-weight: 600;
         """)
-        layout.addWidget(caption_label)
 
+        layout.addWidget(img)
+        layout.addWidget(text)
         return card

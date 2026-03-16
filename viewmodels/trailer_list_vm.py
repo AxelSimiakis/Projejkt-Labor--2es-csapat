@@ -1,11 +1,7 @@
-from database import SessionLocal
-from models.trailer import Trailer
+from services.trailer_service import TrailerService
 
 
 class TrailerListViewModel:
 
     def get_all_trailers(self):
-        session = SessionLocal()
-        trailers = session.query(Trailer).all()
-        session.close()
-        return trailers
+        return TrailerService.get_all_trailers()

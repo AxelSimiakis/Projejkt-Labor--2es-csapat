@@ -2,7 +2,7 @@ import sys
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout, QPushButton,
-    QStackedWidget, QLabel
+    QStackedWidget
 )
 from PySide6.QtCore import Qt
 
@@ -13,7 +13,6 @@ from views.register_view import RegisterView
 from views.profile_view import ProfileView
 from core.session_manager import SessionManager
 from core.image_utils import create_round_avatar
-from core.toast import Toast
 
 
 class MainWindow(QMainWindow):
@@ -30,7 +29,6 @@ class MainWindow(QMainWindow):
         self.main_layout.setSpacing(0)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # ===== NAVBAR =====
         self.navbar = QWidget()
         self.navbar.setObjectName("navbar")
         self.navbar.setFixedHeight(70)
@@ -42,12 +40,11 @@ class MainWindow(QMainWindow):
 
         self.main_layout.addWidget(self.navbar)
 
-        # ===== STACK =====
         self.stack = QStackedWidget()
 
-        self.home_page = HomeView()
+        self.home_page = HomeView(self)
         self.login_page = LoginView(self)
-        self.trailer_page = TrailerListView()
+        self.trailer_page = TrailerListView(self)
         self.register_page = RegisterView(self)
         self.profile_page = ProfileView(self)
 
@@ -65,9 +62,6 @@ class MainWindow(QMainWindow):
         self.apply_styles()
         self.update_navbar()
 
-    # =========================
-    # STÍLUS
-    # =========================
     def apply_styles(self):
         self.setStyleSheet("""
         QMainWindow {
@@ -94,34 +88,29 @@ class MainWindow(QMainWindow):
         }
         """)
 
-    # =========================
-    # NAVBAR FRISSÍTÉS
-    # =========================
-    def update_navbar(self):
+    def go_to_home(self):
+        self.stack.setCurrentWidget(self.home_page)
 
-        # régi elemek törlése
+    def go_to_trailers(self):
+        self.trailer_page.refresh()
+        self.stack.setCurrentWidget(self.trailer_page)
+
+    def update_navbar(self):
         while self.nav_layout.count():
             item = self.nav_layout.takeAt(0)
             widget = item.widget()
             if widget:
                 widget.deleteLater()
 
-        # ---- Bal oldal ----
         logo_btn = QPushButton("PótkocsiPont")
         logo_btn.setStyleSheet("font-weight: bold; font-size: 18px;")
-        logo_btn.clicked.connect(
-            lambda: self.stack.setCurrentWidget(self.home_page)
-        )
+        logo_btn.clicked.connect(self.go_to_home)
 
         home_btn = QPushButton("Főoldal")
         trailers_btn = QPushButton("Utánfutók")
 
-        home_btn.clicked.connect(
-            lambda: self.stack.setCurrentWidget(self.home_page)
-        )
-        trailers_btn.clicked.connect(
-            lambda: self.stack.setCurrentWidget(self.trailer_page)
-        )
+        home_btn.clicked.connect(self.go_to_home)
+        trailers_btn.clicked.connect(self.go_to_trailers)
 
         self.nav_layout.addWidget(logo_btn)
         self.nav_layout.addSpacing(40)
@@ -131,27 +120,18 @@ class MainWindow(QMainWindow):
 
         session = SessionManager.instance()
 
-        # ===== NINCS BEJELENTKEZVE =====
         if not session.is_authenticated():
-
             register_btn = QPushButton("Regisztráció")
-            register_btn.clicked.connect(
-                lambda: self.stack.setCurrentWidget(self.register_page)
-            )
+            register_btn.clicked.connect(lambda: self.stack.setCurrentWidget(self.register_page))
 
             login_btn = QPushButton("Belépés")
-            login_btn.clicked.connect(
-                lambda: self.stack.setCurrentWidget(self.login_page)
-            )
+            login_btn.clicked.connect(lambda: self.stack.setCurrentWidget(self.login_page))
 
             self.nav_layout.addWidget(register_btn)
             self.nav_layout.addWidget(login_btn)
-
-        # ===== BEJELENTKEZVE =====
         else:
             user = session.get_user()
 
-            # ---- Profilkép (kattintható) ----
             avatar_btn = QPushButton()
             avatar_btn.setFixedSize(40, 40)
             avatar_btn.setCursor(Qt.PointingHandCursor)
@@ -162,44 +142,31 @@ class MainWindow(QMainWindow):
             avatar_btn.clicked.connect(self.open_profile)
 
             if user and user.profile_image_path:
-                avatar = create_round_avatar(
-                    user.profile_image_path,
-                    40
-                )
+                avatar = create_round_avatar(user.profile_image_path, 40)
                 avatar_btn.setIcon(avatar)
                 avatar_btn.setIconSize(avatar_btn.size())
 
             self.nav_layout.addWidget(avatar_btn)
 
-            # ---- Adataim ----
             profile_btn = QPushButton("Adataim")
             profile_btn.clicked.connect(self.open_profile)
             self.nav_layout.addWidget(profile_btn)
 
-            # ---- Kilépés ----
             logout_btn = QPushButton("Kilépés")
             logout_btn.clicked.connect(self.handle_logout)
             self.nav_layout.addWidget(logout_btn)
 
-    # =========================
-    # PROFIL MEGNYITÁS
-    # =========================
     def open_profile(self):
         self.profile_page.load_user()
         self.stack.setCurrentWidget(self.profile_page)
 
-    # =========================
-    # LOGOUT
-    # =========================
     def handle_logout(self):
         SessionManager.instance().logout()
+        self.trailer_page.refresh()
         self.update_navbar()
-        self.stack.setCurrentWidget(self.home_page)
+        self.go_to_home()
 
 
-# =========================
-# INDÍTÁS
-# =========================
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")

@@ -1,17 +1,17 @@
 from sqlalchemy import Column, Integer, String, Boolean
 from .base import Base
 
+
 class Trailer(Base):
     __tablename__ = "trailers"
 
     id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
+    description = Column(String, nullable=True)
 
-    name = Column(String, nullable=False)
-    description = Column(String)
-
-    length_cm = Column(Integer)
-    width_cm = Column(Integer)
-    max_weight = Column(Integer)
+    length_cm = Column(Integer, nullable=False)
+    width_cm = Column(Integer, nullable=False)
+    max_weight = Column(Integer, nullable=False)
 
     price_morning = Column(Integer, nullable=False)
     price_afternoon = Column(Integer, nullable=False)
@@ -21,3 +21,5 @@ class Trailer(Base):
     late_fee = Column(Integer, nullable=False)
 
     is_active = Column(Boolean, default=True)
+
+    image_path = Column(String, nullable=True)

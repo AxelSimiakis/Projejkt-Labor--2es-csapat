@@ -9,6 +9,7 @@ from viewmodels.login_vm import LoginViewModel
 from core.session_manager import SessionManager
 from core.toast import Toast
 
+
 class LoginView(QWidget):
 
     def __init__(self, main_window):
@@ -19,7 +20,6 @@ class LoginView(QWidget):
         outer_layout = QVBoxLayout()
         outer_layout.addStretch()
 
-        # ===== KÁRTYA PANEL =====
         self.card = QFrame()
         self.card.setFixedWidth(400)
         self.card.setStyleSheet("""
@@ -79,23 +79,17 @@ class LoginView(QWidget):
 
         self.setLayout(outer_layout)
 
-    # =====================
-    # LOGIN LOGIKA
-    # =====================
     def handle_login(self):
-
-        success, user = self.vm.login(
-            self.email.text(),
-            self.password.text()
-        )
+        success, user = self.vm.login(self.email.text(), self.password.text())
 
         if success:
             SessionManager.instance().login(user)
+            self.main_window.update_navbar()
+            self.main_window.trailer_page.refresh()
+            self.main_window.go_to_home()
+
             toast = Toast(self.main_window, "Sikeres bejelentkezés!", success=True)
             toast.show_toast()
-
-            self.main_window.update_navbar()
-            self.main_window.stack.setCurrentIndex(0)
         else:
             toast = Toast(self.main_window, "Hibás email vagy jelszó!", success=False)
             toast.show_toast()
