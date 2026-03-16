@@ -39,6 +39,23 @@ def get_bookings_for_trailer_and_date(trailer_id: int, booking_date: date):
         session.close()
 
 
+def get_bookings_for_trailer_between_dates(trailer_id: int, start_date: date, end_date: date):
+    session = SessionLocal()
+    try:
+        return (
+            session.query(Booking)
+            .filter(
+                Booking.trailer_id == trailer_id,
+                Booking.booking_date >= start_date,
+                Booking.booking_date <= end_date,
+                Booking.status.in_(ACTIVE_STATUSES),
+            )
+            .all()
+        )
+    finally:
+        session.close()
+
+
 def get_availability_for_trailer_and_date(trailer_id: int, booking_date: date) -> dict:
     bookings = get_bookings_for_trailer_and_date(trailer_id, booking_date)
 
@@ -66,6 +83,41 @@ def get_availability_for_trailer_and_date(trailer_id: int, booking_date: date) -
             availability[FULL_DAY] = False
 
     return availability
+
+
+def get_availability_map_for_period(trailer_id: int, start_date: date, end_date: date) -> dict:
+    """
+    Visszatérés:
+    {
+        date(2026, 3, 18): "free" | "partial" | "full"
+    }
+    """
+    bookings = get_bookings_for_trailer_between_dates(trailer_id, start_date, end_date)
+
+    grouped = {}
+    for booking in bookings:
+        grouped.setdefault(booking.booking_date, []).append(_normalize_period(booking.period))
+
+    result = {}
+    current = start_date
+    while current <= end_date:
+        periods = grouped.get(current, [])
+
+        if FULL_DAY in periods:
+            result[current] = "full"
+        elif MORNING in periods or AFTERNOON in periods:
+            # ha legalább egyik félnap foglalt
+            if MORNING in periods and AFTERNOON in periods:
+                result[current] = "full"
+            else:
+                result[current] = "partial"
+        else:
+            result[current] = "free"
+
+        from datetime import timedelta
+        current += timedelta(days=1)
+
+    return result
 
 
 def is_trailer_available(trailer_id: int, booking_date: date, period: str) -> bool:

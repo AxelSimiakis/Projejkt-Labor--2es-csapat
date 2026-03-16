@@ -1,27 +1,175 @@
 from datetime import date
+import calendar
 
-from PySide6.QtCore import QDate, Qt
-from PySide6.QtGui import QPixmap
+from PySide6.QtCore import QDate, Qt, Signal, QRect
+from PySide6.QtGui import QPixmap, QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QListWidget,
-    QListWidgetItem,
     QPushButton,
     QComboBox,
     QMessageBox,
-    QDateEdit,
     QFrame,
+    QScrollArea,
+    QGridLayout,
+    QCalendarWidget,
 )
 
 from core.session_manager import SessionManager
 from services.booking_service import (
     create_booking,
     get_availability_for_trailer_and_date,
+    get_availability_map_for_period,
 )
 from viewmodels.trailer_list_vm import TrailerListViewModel
+
+
+class AvailabilityCalendar(QCalendarWidget):
+    dayClicked = Signal(QDate)
+    pageChangedManually = Signal(int, int)
+
+    def __init__(self):
+        super().__init__()
+        self.availability_map = {}
+
+        self.setGridVisible(True)
+        self.clicked.connect(self.dayClicked.emit)
+        self.currentPageChanged.connect(self._emit_page_changed)
+
+        self.setStyleSheet("""
+            QCalendarWidget QWidget {
+                alternate-background-color: #111827;
+                background-color: #111827;
+                color: white;
+                font-size: 11px;
+            }
+            QCalendarWidget QToolButton {
+                color: white;
+                font-weight: bold;
+                background: transparent;
+                margin: 2px;
+                padding: 4px;
+            }
+            QCalendarWidget QMenu {
+                background-color: #1f2937;
+                color: white;
+            }
+            QCalendarWidget QSpinBox {
+                color: white;
+                background-color: #1f2937;
+                selection-background-color: #16a34a;
+            }
+            QCalendarWidget QAbstractItemView:enabled {
+                color: white;
+                background-color: #111827;
+                selection-background-color: transparent;
+                selection-color: white;
+                font-size: 11px;
+            }
+        """)
+
+    def _emit_page_changed(self, year, month):
+        self.pageChangedManually.emit(year, month)
+
+    def set_availability_map(self, availability_map: dict):
+        self.availability_map = availability_map
+        self.updateCells()
+
+    def paintCell(self, painter: QPainter, rect: QRect, qdate: QDate):
+        py_date = date(qdate.year(), qdate.month(), qdate.day())
+        state = self.availability_map.get(py_date, "free")
+
+        painter.save()
+
+        if state == "full":
+            painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#dc2626"))
+        elif state == "partial":
+            painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#f59e0b"))
+        elif state == "free":
+            painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#16a34a"))
+
+        if qdate == self.selectedDate():
+            pen = QPen(QColor("#ffffff"))
+            pen.setWidth(2)
+            painter.setPen(pen)
+            painter.drawRect(rect.adjusted(1, 1, -2, -2))
+
+        painter.setPen(QColor("white"))
+        painter.drawText(rect, Qt.AlignCenter, str(qdate.day()))
+
+        painter.restore()
+
+
+class TrailerCard(QFrame):
+    clicked = Signal(object)
+
+    def __init__(self, trailer):
+        super().__init__()
+        self.trailer = trailer
+        self.setCursor(Qt.PointingHandCursor)
+        self.setObjectName("trailerCard")
+        self.setStyleSheet("""
+            QFrame#trailerCard {
+                background-color: #1f2937;
+                border: 1px solid #374151;
+                border-radius: 14px;
+            }
+            QFrame#trailerCard:hover {
+                border: 1px solid #16a34a;
+                background-color: #243042;
+            }
+        """)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        self.image_label = QLabel()
+        self.image_label.setFixedHeight(140)
+        self.image_label.setAlignment(Qt.AlignCenter)
+        self.image_label.setStyleSheet("""
+            background-color: #111827;
+            border-radius: 10px;
+            color: #9ca3af;
+        """)
+
+        pixmap = QPixmap(getattr(trailer, "image_path", "") or "")
+        if not pixmap.isNull():
+            self.image_label.setPixmap(
+                pixmap.scaled(
+                    260,
+                    140,
+                    Qt.KeepAspectRatioByExpanding,
+                    Qt.SmoothTransformation
+                )
+            )
+        else:
+            self.image_label.setText("Nincs kép")
+
+        self.name_label = QLabel(trailer.name)
+        self.name_label.setStyleSheet("font-size: 16px; font-weight: bold; color: white;")
+
+        self.desc_label = QLabel((trailer.description or "Nincs leírás.")[:70])
+        self.desc_label.setWordWrap(True)
+        self.desc_label.setStyleSheet("color: #d1d5db; font-size: 12px;")
+
+        self.price_label = QLabel(
+            f"Délelőtt: {trailer.price_morning} Ft\n"
+            f"Délután: {trailer.price_afternoon} Ft\n"
+            f"Egész nap: {trailer.price_full_day} Ft"
+        )
+        self.price_label.setStyleSheet("color: #f3f4f6; font-size: 12px;")
+
+        layout.addWidget(self.image_label)
+        layout.addWidget(self.name_label)
+        layout.addWidget(self.desc_label)
+        layout.addWidget(self.price_label)
+
+    def mousePressEvent(self, event):
+        self.clicked.emit(self.trailer)
+        super().mousePressEvent(event)
 
 
 class TrailerListView(QWidget):
@@ -30,97 +178,155 @@ class TrailerListView(QWidget):
         self.main_window = main_window
         self.viewmodel = TrailerListViewModel()
         self.trailers = []
+        self.selected_trailer = None
 
         self.setWindowTitle("Elérhető utánfutók")
-        self.setMinimumWidth(700)
 
-        root = QVBoxLayout(self)
-        root.setContentsMargins(20, 20, 20, 20)
-        root.setSpacing(16)
+        root = QHBoxLayout(self)
+        root.setContentsMargins(16, 16, 16, 16)
+        root.setSpacing(20)
 
-        title = QLabel("Elérhető utánfutók")
-        title.setStyleSheet("font-size: 22px; font-weight: bold; color: white;")
-        root.addWidget(title)
-
-        content = QHBoxLayout()
-        content.setSpacing(20)
-        root.addLayout(content)
-
-        self.list_widget = QListWidget()
-        self.list_widget.currentRowChanged.connect(self.on_trailer_selected)
-        self.list_widget.setMinimumWidth(420)
-        content.addWidget(self.list_widget, 2)
-
-        right_panel = QFrame()
-        right_panel.setStyleSheet(
-            "QFrame { background-color: #1f2937; border-radius: 12px; padding: 12px; color: white; }"
-        )
-        right_layout = QVBoxLayout(right_panel)
-        right_layout.setSpacing(12)
-        content.addWidget(right_panel, 3)
-
-        self.image_label = QLabel()
-        self.image_label.setFixedSize(320, 180)
-        self.image_label.setAlignment(Qt.AlignCenter)
-        self.image_label.setStyleSheet("""
-            QLabel {
-                background-color: #111827;
-                border: 1px solid #374151;
-                border-radius: 10px;
-                color: #9ca3af;
+        # Bal oldal - csempék
+        left_wrapper = QFrame()
+        left_wrapper.setStyleSheet("""
+            QFrame {
+                background-color: transparent;
+                border-radius: 12px;
             }
         """)
-        self.image_label.setText("Nincs kép")
+        left_layout = QVBoxLayout(left_wrapper)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(12)
+
+        left_title = QLabel("Elérhető utánfutók")
+        left_title.setStyleSheet("font-size: 28px; font-weight: bold; color: white;")
+        left_layout.addWidget(left_title)
+
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background: transparent;
+            }
+        """)
+
+        self.cards_container = QWidget()
+        self.cards_layout = QGridLayout(self.cards_container)
+        self.cards_layout.setSpacing(16)
+        self.cards_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.scroll.setWidget(self.cards_container)
+        left_layout.addWidget(self.scroll)
+
+        root.addWidget(left_wrapper, 3)
+
+        # Jobb oldal - scrollozható részletek panel
+        self.right_scroll = QScrollArea()
+        self.right_scroll.setWidgetResizable(True)
+        self.right_scroll.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background: transparent;
+            }
+        """)
+
+        self.right_panel = QFrame()
+        self.right_panel.setStyleSheet("""
+            QFrame {
+                background-color: #1f2937;
+                border-radius: 16px;
+                color: white;
+            }
+        """)
+        self.right_panel.setMinimumWidth(430)
+
+        right_layout = QVBoxLayout(self.right_panel)
+        right_layout.setContentsMargins(18, 18, 18, 18)
+        right_layout.setSpacing(8)
+
+        self.image_label = QLabel("Válassz egy utánfutót")
+        self.image_label.setFixedHeight(220)
+        self.image_label.setAlignment(Qt.AlignCenter)
+        self.image_label.setStyleSheet("""
+            background-color: #111827;
+            border: 1px solid #374151;
+            border-radius: 12px;
+            color: #9ca3af;
+            font-size: 16px;
+        """)
         right_layout.addWidget(self.image_label)
 
-        self.name_label = QLabel("Válassz egy utánfutót")
-        self.name_label.setStyleSheet("font-size: 18px; font-weight: bold; color: white;")
+        self.name_label = QLabel("Nincs kiválasztott utánfutó")
+        self.name_label.setStyleSheet("font-size: 22px; font-weight: bold; color: white;")
         right_layout.addWidget(self.name_label)
 
-        self.description_label = QLabel("-")
+        self.description_label = QLabel("Kattints a bal oldali csempék egyikére.")
         self.description_label.setWordWrap(True)
-        self.description_label.setStyleSheet("color: #d1d5db;")
+        self.description_label.setStyleSheet("color: #d1d5db; font-size: 14px;")
         right_layout.addWidget(self.description_label)
 
         self.price_label = QLabel("-")
-        self.price_label.setStyleSheet("color: white;")
+        self.price_label.setStyleSheet("color: white; font-size: 14px;")
         right_layout.addWidget(self.price_label)
 
-        date_row = QHBoxLayout()
-        date_label = QLabel("Dátum:")
-        date_label.setStyleSheet("color: white;")
-        date_row.addWidget(date_label)
+        legend = QLabel("Jelmagyarázat: zöld = szabad, sárga = részben foglalt, piros = teljesen foglalt")
+        legend.setWordWrap(True)
+        legend.setStyleSheet("color: #d1d5db; font-size: 12px;")
+        right_layout.addWidget(legend)
 
-        self.date_edit = QDateEdit()
-        self.date_edit.setCalendarPopup(True)
-        self.date_edit.setDate(QDate.currentDate())
-        self.date_edit.setMinimumDate(QDate.currentDate())
-        date_row.addWidget(self.date_edit)
+        self.calendar = AvailabilityCalendar()
+        self.calendar.setFixedHeight(280)
+        self.calendar.setMinimumHeight(280)
+        self.calendar.setMaximumHeight(280)
+        self.calendar.dayClicked.connect(self.on_calendar_day_selected)
+        self.calendar.pageChangedManually.connect(self.refresh_calendar_month)
+        right_layout.addWidget(self.calendar)
 
-        right_layout.addLayout(date_row)
-
-        self.check_button = QPushButton("Foglaltság ellenőrzése")
-        self.check_button.clicked.connect(self.refresh_availability)
-        right_layout.addWidget(self.check_button)
+        self.selected_date_label = QLabel("Kiválasztott dátum: -")
+        self.selected_date_label.setStyleSheet("color: white; font-size: 14px;")
+        right_layout.addWidget(self.selected_date_label)
 
         self.availability_morning = QLabel("Délelőtt: -")
         self.availability_afternoon = QLabel("Délután: -")
         self.availability_full_day = QLabel("Egész nap: -")
 
-        for label in [
-            self.availability_morning,
-            self.availability_afternoon,
-            self.availability_full_day,
-        ]:
-            label.setStyleSheet("font-size: 14px; color: white;")
+        for label in [self.availability_morning, self.availability_afternoon, self.availability_full_day]:
+            label.setStyleSheet("color: white; font-size: 14px;")
             right_layout.addWidget(label)
 
         self.period_combo = QComboBox()
-        self.period_combo.addItems(["morning", "afternoon", "full_day"])
+
+        self.period_combo.addItem("Délelőtt", "morning")
+        self.period_combo.addItem("Délután", "afternoon")
+        self.period_combo.addItem("Egész nap", "full_day")
+
+        self.period_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #111827;
+                color: white;
+                padding: 8px;
+                border-radius: 8px;
+                border: 1px solid #374151;
+            }
+        """)
         right_layout.addWidget(self.period_combo)
 
         self.book_button = QPushButton("Foglalás")
         self.book_button.clicked.connect(self.book_selected_trailer)
+        self.book_button.setStyleSheet("""
+            QPushButton {
+                background-color: #16a34a;
+                color: white;
+                padding: 10px;
+                border: none;
+                border-radius: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #15803d;
+            }
+        """)
         right_layout.addWidget(self.book_button)
 
         self.login_hint = QLabel("")
@@ -130,28 +336,47 @@ class TrailerListView(QWidget):
 
         right_layout.addStretch()
 
+        self.right_scroll.setWidget(self.right_panel)
+        root.addWidget(self.right_scroll, 2)
+
         self.load_trailers()
         self.refresh_auth_state()
 
+    def clear_layout(self, layout):
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
     def load_trailers(self):
         self.trailers = self.viewmodel.get_all_trailers()
-        self.list_widget.clear()
+        self.clear_layout(self.cards_layout)
+
+        columns = 2
+        row = 0
+        col = 0
 
         for trailer in self.trailers:
-            text = (
-                f"{trailer.name} | Délelőtt: {trailer.price_morning} Ft | "
-                f"Délután: {trailer.price_afternoon} Ft | Egész nap: {trailer.price_full_day} Ft"
-            )
-            self.list_widget.addItem(QListWidgetItem(text))
+            card = TrailerCard(trailer)
+            card.clicked.connect(self.select_trailer)
+            self.cards_layout.addWidget(card, row, col)
+
+            col += 1
+            if col >= columns:
+                col = 0
+                row += 1
 
         if self.trailers:
-            self.list_widget.setCurrentRow(0)
+            self.select_trailer(self.trailers[0])
         else:
+            self.selected_trailer = None
             self.name_label.setText("Nincs elérhető utánfutó")
             self.description_label.setText("A listában jelenleg nincs aktív utánfutó.")
-            self.price_label.setText("")
+            self.price_label.setText("-")
             self.image_label.setPixmap(QPixmap())
             self.image_label.setText("Nincs kép")
+            self.selected_date_label.setText("Kiválasztott dátum: -")
             self.clear_availability_labels()
 
     def refresh(self):
@@ -168,11 +393,8 @@ class TrailerListView(QWidget):
         else:
             self.login_hint.setText("Foglalni csak bejelentkezés után lehet.")
 
-    def on_trailer_selected(self, row: int):
-        if row < 0 or row >= len(self.trailers):
-            return
-
-        trailer = self.trailers[row]
+    def select_trailer(self, trailer):
+        self.selected_trailer = trailer
         self.name_label.setText(trailer.name)
         self.description_label.setText(trailer.description or "Nincs leírás.")
         self.price_label.setText(
@@ -183,7 +405,14 @@ class TrailerListView(QWidget):
         )
 
         self.load_trailer_image(getattr(trailer, "image_path", None))
-        self.refresh_availability()
+
+        selected_qdate = self.calendar.selectedDate()
+        self.selected_date_label.setText(
+            f"Kiválasztott dátum: {selected_qdate.toString('yyyy.MM.dd.')}"
+        )
+
+        self.refresh_calendar_month(selected_qdate.year(), selected_qdate.month())
+        self.refresh_day_availability()
 
     def load_trailer_image(self, image_path):
         if not image_path:
@@ -206,29 +435,41 @@ class TrailerListView(QWidget):
         self.image_label.setPixmap(scaled)
         self.image_label.setText("")
 
-    def get_selected_trailer(self):
-        row = self.list_widget.currentRow()
-        if row < 0 or row >= len(self.trailers):
-            return None
-        return self.trailers[row]
+    def on_calendar_day_selected(self, qdate: QDate):
+        self.selected_date_label.setText(f"Kiválasztott dátum: {qdate.toString('yyyy.MM.dd.')}")
+        self.refresh_day_availability()
 
     def get_selected_booking_date(self) -> date:
-        selected = self.date_edit.date()
-        return date(selected.year(), selected.month(), selected.day())
+        qdate = self.calendar.selectedDate()
+        return date(qdate.year(), qdate.month(), qdate.day())
+
+    def refresh_calendar_month(self, year: int, month: int):
+        if not self.selected_trailer:
+            return
+
+        first_day = date(year, month, 1)
+        last_day_num = calendar.monthrange(year, month)[1]
+        last_day = date(year, month, last_day_num)
+
+        availability_map = get_availability_map_for_period(
+            self.selected_trailer.id,
+            first_day,
+            last_day
+        )
+        self.calendar.set_availability_map(availability_map)
 
     def clear_availability_labels(self):
         self.availability_morning.setText("Délelőtt: -")
         self.availability_afternoon.setText("Délután: -")
         self.availability_full_day.setText("Egész nap: -")
 
-    def refresh_availability(self):
-        trailer = self.get_selected_trailer()
-        if trailer is None:
+    def refresh_day_availability(self):
+        if not self.selected_trailer:
             self.clear_availability_labels()
             return
 
         booking_date = self.get_selected_booking_date()
-        availability = get_availability_for_trailer_and_date(trailer.id, booking_date)
+        availability = get_availability_for_trailer_and_date(self.selected_trailer.id, booking_date)
 
         self.availability_morning.setText(
             f"Délelőtt: {'Szabad' if availability['morning'] else 'Foglalt'}"
@@ -241,8 +482,7 @@ class TrailerListView(QWidget):
         )
 
     def book_selected_trailer(self):
-        trailer = self.get_selected_trailer()
-        if trailer is None:
+        if self.selected_trailer is None:
             QMessageBox.warning(self, "Hiba", "Először válassz utánfutót.")
             return
 
@@ -252,12 +492,13 @@ class TrailerListView(QWidget):
             return
 
         booking_date = self.get_selected_booking_date()
-        period = self.period_combo.currentText()
+        period = self.period_combo.currentData()
 
         try:
-            create_booking(user.id, trailer.id, booking_date, period)
+            create_booking(user.id, self.selected_trailer.id, booking_date, period)
             QMessageBox.information(self, "Siker", "A foglalás sikeresen létrejött.")
-            self.refresh_availability()
+            self.refresh_calendar_month(booking_date.year, booking_date.month)
+            self.refresh_day_availability()
         except ValueError as exc:
             QMessageBox.warning(self, "Hiba", str(exc))
         except Exception as exc:
