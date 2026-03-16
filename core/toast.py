@@ -20,7 +20,7 @@ class Toast(QWidget):
         self.label.setAlignment(Qt.AlignCenter)
 
         if success:
-            bg_color = "#16a34a"  # zöld
+            bg_color = "#00FF00"  # zöld
         else:
             bg_color = "#dc2626"  # piros
 
@@ -29,8 +29,9 @@ class Toast(QWidget):
                 background-color: {bg_color};
                 border-radius: 12px;
             }}
+
             QLabel {{
-                color: white;
+                color: black;
                 font-size: 14px;
             }}
         """)

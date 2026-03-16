@@ -4,8 +4,11 @@ from PySide6.QtWidgets import (
     QFileDialog, QGridLayout
 )
 from PySide6.QtCore import Qt
+
 from core.session_manager import SessionManager
 from core.image_utils import create_round_avatar
+from core.toast import Toast
+
 from database import SessionLocal
 from models.user import User
 
@@ -14,6 +17,7 @@ class ProfileView(QWidget):
 
     def __init__(self, main_window):
         super().__init__()
+
         self.main_window = main_window
 
         container = QVBoxLayout()
@@ -30,7 +34,10 @@ class ProfileView(QWidget):
         layout.setContentsMargins(60, 60, 60, 60)
         layout.setSpacing(60)
 
-        # ===== AVATAR =====
+        # ======================
+        # AVATAR
+        # ======================
+
         left = QVBoxLayout()
         left.setAlignment(Qt.AlignCenter)
 
@@ -43,7 +50,10 @@ class ProfileView(QWidget):
         self.avatar_btn.clicked.connect(self.change_avatar)
         left.addWidget(self.avatar_btn)
 
-        # ===== ADATOK =====
+        # ======================
+        # ADATOK
+        # ======================
+
         right = QGridLayout()
         right.setSpacing(15)
 
@@ -89,11 +99,18 @@ class ProfileView(QWidget):
         layout.addLayout(right)
 
         self.card.setLayout(layout)
+
         container.addWidget(self.card)
         self.setLayout(container)
 
+    # ======================
+    # USER BETÖLTÉS
+    # ======================
+
     def load_user(self):
+
         user = SessionManager.instance().get_user()
+
         if not user:
             return
 
@@ -111,32 +128,77 @@ class ProfileView(QWidget):
             avatar = create_round_avatar(user.profile_image_path, 150)
             self.avatar_label.setPixmap(avatar)
 
+    # ======================
+    # AVATAR CSERE
+    # ======================
+
     def change_avatar(self):
+
         path, _ = QFileDialog.getOpenFileName(
-            self, "Profilkép", "", "Images (*.png *.jpg *.jpeg)"
+            self,
+            "Profilkép",
+            "",
+            "Images (*.png *.jpg *.jpeg)"
         )
+
         if not path:
             return
 
         session = SessionLocal()
+
         user = session.query(User).filter_by(
             id=SessionManager.instance().get_user().id
         ).first()
 
         user.profile_image_path = path
         session.commit()
-        session.close()
 
         SessionManager.instance()._user.profile_image_path = path
+
+        session.close()
 
         self.load_user()
         self.main_window.update_navbar()
 
+        toast = Toast(self.main_window, "Profilkép frissítve!", True)
+        toast.show_toast()
+
+    # ======================
+    # ADATOK MENTÉSE
+    # ======================
+
     def save_changes(self):
+
         session = SessionLocal()
         current = SessionManager.instance().get_user()
 
         user = session.query(User).filter_by(id=current.id).first()
+
+        # ======================
+        # VÁLTOZÁS ELLENŐRZÉS
+        # ======================
+
+        if (
+            user.first_name == self.first_name.text() and
+            user.last_name == self.last_name.text() and
+            user.phone == self.phone.text() and
+            user.country == self.country.text() and
+            user.zip_code == self.zip_code.text() and
+            user.city == self.city.text() and
+            user.street == self.street.text() and
+            user.house_number == self.house_number.text()
+        ):
+
+            session.close()
+
+            toast = Toast(self.main_window, "Nincs módosítás.", False)
+            toast.show_toast()
+
+            return
+
+        # ======================
+        # MENTÉS
+        # ======================
 
         user.first_name = self.first_name.text()
         user.last_name = self.last_name.text()
@@ -148,4 +210,20 @@ class ProfileView(QWidget):
         user.house_number = self.house_number.text()
 
         session.commit()
+
+        # SessionManager frissítés
+        SessionManager.instance()._user.first_name = user.first_name
+        SessionManager.instance()._user.last_name = user.last_name
+        SessionManager.instance()._user.phone = user.phone
+        SessionManager.instance()._user.country = user.country
+        SessionManager.instance()._user.zip_code = user.zip_code
+        SessionManager.instance()._user.city = user.city
+        SessionManager.instance()._user.street = user.street
+        SessionManager.instance()._user.house_number = user.house_number
+
         session.close()
+
+        self.main_window.update_navbar()
+
+        toast = Toast(self.main_window, "Adatok sikeresen mentve!", True)
+        toast.show_toast()
