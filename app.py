@@ -11,6 +11,8 @@ from views.login_view import LoginView
 from views.trailer_list_view import TrailerListView
 from views.register_view import RegisterView
 from views.profile_view import ProfileView
+from views.user_view import UserView
+from views.booking_view import BookingView
 from core.session_manager import SessionManager
 from core.image_utils import create_round_avatar
 
@@ -47,12 +49,17 @@ class MainWindow(QMainWindow):
         self.trailer_page = TrailerListView(self)
         self.register_page = RegisterView(self)
         self.profile_page = ProfileView(self)
+        self.booking_page = BookingView(self)
+        self.user_page = UserView(self)
+
 
         self.stack.addWidget(self.home_page)
         self.stack.addWidget(self.login_page)
         self.stack.addWidget(self.trailer_page)
         self.stack.addWidget(self.register_page)
         self.stack.addWidget(self.profile_page)
+        self.stack.addWidget(self.booking_page)
+        self.stack.addWidget(self.user_page)
 
         self.main_layout.addWidget(self.stack)
 
@@ -80,7 +87,7 @@ class MainWindow(QMainWindow):
             background: transparent;
             border: none;
             color: white;
-            font-size: 15px;
+            font-size: 18px;
         }
 
         QPushButton:hover {
@@ -103,7 +110,7 @@ class MainWindow(QMainWindow):
                 widget.deleteLater()
 
         logo_btn = QPushButton("PótkocsiPont")
-        logo_btn.setStyleSheet("font-weight: bold; font-size: 18px;")
+        logo_btn.setStyleSheet("font-weight: bold; font-size: 20px;")
         logo_btn.clicked.connect(self.go_to_home)
 
         home_btn = QPushButton("Főoldal")
@@ -131,6 +138,7 @@ class MainWindow(QMainWindow):
             self.nav_layout.addWidget(login_btn)
         else:
             user = session.get_user()
+            role = user.role
 
             avatar_btn = QPushButton()
             avatar_btn.setFixedSize(40, 40)
@@ -148,6 +156,18 @@ class MainWindow(QMainWindow):
 
             self.nav_layout.addWidget(avatar_btn)
 
+            # ===== ADMIN / EMPLOYEE GOMBOK =====
+            if role in ["admin", "employee"]:
+                bookings_btn = QPushButton("Foglalások")
+                bookings_btn.clicked.connect(self.open_bookings)
+                self.nav_layout.addWidget(bookings_btn)
+
+            if role == "admin":
+                users_btn = QPushButton("Felhasználók")
+                users_btn.clicked.connect(self.open_users)
+                self.nav_layout.addWidget(users_btn)
+
+            # ===== ALAP GOMBOK =====
             profile_btn = QPushButton("Adataim")
             profile_btn.clicked.connect(self.open_profile)
             self.nav_layout.addWidget(profile_btn)
@@ -155,6 +175,15 @@ class MainWindow(QMainWindow):
             logout_btn = QPushButton("Kilépés")
             logout_btn.clicked.connect(self.handle_logout)
             self.nav_layout.addWidget(logout_btn)
+    
+    
+    def open_bookings(self):
+        self.booking_page.load_data()
+        self.stack.setCurrentWidget(self.booking_page)
+
+    def open_users(self):
+        self.user_page.load_data()
+        self.stack.setCurrentWidget(self.user_page)
 
     def open_profile(self):
         self.profile_page.load_user()

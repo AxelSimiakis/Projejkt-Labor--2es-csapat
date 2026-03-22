@@ -60,7 +60,6 @@ python -m venv venv
 
 venv\Scripts\activate
 
-
 ### 2. Csomagok telepítése
 
 pip install -r requirements.txt

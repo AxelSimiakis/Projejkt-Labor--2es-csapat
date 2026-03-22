@@ -12,6 +12,10 @@ class Booking(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     trailer_id = Column(Integer, ForeignKey("trailers.id"), nullable=False)
 
+    # technikai foglaláshoz
+    name = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+
     booking_date = Column(Date, nullable=False)
 
     period = Column(String, nullable=False)
