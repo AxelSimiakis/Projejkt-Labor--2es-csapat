@@ -2,7 +2,9 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLineEdit,
     QPushButton, QLabel, QFileDialog
 )
-from PySide6.QtCore import Qt
+from PySide6.QtGui import QIntValidator, QRegularExpressionValidator
+from PySide6.QtCore import Qt, QRegularExpression
+
 from database import SessionLocal
 from models.user import User
 from passlib.hash import bcrypt
@@ -31,7 +33,16 @@ class RegisterView(QWidget):
         layout.setContentsMargins(40, 40, 40, 40)
         layout.setSpacing(15)
 
-        # ===== AVATAR PREVIEW =====
+        # ===== VALIDÁTOROK =====
+        text_regex = QRegularExpression("^[A-Za-zÁÉÍÓÖŐÚÜŰáéíóöőúüű ]+$")
+        text_validator = QRegularExpressionValidator(text_regex)
+
+        number_validator = QIntValidator()
+
+        phone_regex = QRegularExpression(r"^\+\d{2} \d{2} \d{3} \d{4}$")
+        phone_validator = QRegularExpressionValidator(phone_regex)
+
+        # ===== AVATAR =====
         self.avatar_preview = QLabel()
         self.avatar_preview.setFixedSize(120, 120)
         self.avatar_preview.setAlignment(Qt.AlignCenter)
@@ -41,37 +52,46 @@ class RegisterView(QWidget):
         self.avatar_btn.clicked.connect(self.select_avatar)
         layout.addWidget(self.avatar_btn)
 
-        # ===== ADATOK =====
-        self.first_name = QLineEdit()
-        self.first_name.setPlaceholderText("Vezetéknév")
+        # ===== INPUTOK =====
+        def create_input(placeholder):
+            field = QLineEdit()
+            field.setPlaceholderText(placeholder)
+            field.setStyleSheet("padding:8px; border-radius:6px;")
+            return field
 
-        self.last_name = QLineEdit()
-        self.last_name.setPlaceholderText("Keresztnév")
-
-        self.email = QLineEdit()
-        self.email.setPlaceholderText("Email")
-
-        self.password = QLineEdit()
-        self.password.setPlaceholderText("Jelszó")
+        self.first_name = create_input("Vezetéknév")
+        self.last_name = create_input("Keresztnév")
+        self.email = create_input("Email")
+        self.password = create_input("Jelszó")
         self.password.setEchoMode(QLineEdit.Password)
 
-        self.phone = QLineEdit()
-        self.phone.setPlaceholderText("Telefon")
+        self.phone = create_input("Telefonszám +36 70 000 0000")
 
-        self.country = QLineEdit()
-        self.country.setPlaceholderText("Ország")
+        self.country = create_input("Ország")
+        self.zip_code = create_input("Irányítószám")
+        self.city = create_input("Város")
+        self.street = create_input("Utca")
+        self.house_number = create_input("Házszám")
 
-        self.zip_code = QLineEdit()
-        self.zip_code.setPlaceholderText("Irányítószám")
+        # ===== VALIDÁTOROK HOZZÁADÁSA =====
+        for f in [self.first_name, self.last_name, self.country, self.city, self.street]:
+            f.setValidator(text_validator)
 
-        self.city = QLineEdit()
-        self.city.setPlaceholderText("Város")
+        for f in [self.zip_code, self.house_number]:
+            f.setValidator(number_validator)
 
-        self.street = QLineEdit()
-        self.street.setPlaceholderText("Utca")
+        self.phone.setValidator(phone_validator)
 
-        self.house_number = QLineEdit()
-        self.house_number.setPlaceholderText("Házszám")
+        # ===== MAX LENGTH =====
+        self.first_name.setMaxLength(50)
+        self.last_name.setMaxLength(50)
+        self.country.setMaxLength(50)
+        self.city.setMaxLength(50)
+        self.street.setMaxLength(100)
+
+        self.zip_code.setMaxLength(4)
+        self.house_number.setMaxLength(10)
+        self.phone.setMaxLength(16)
 
         fields = [
             self.first_name, self.last_name,
@@ -82,9 +102,9 @@ class RegisterView(QWidget):
         ]
 
         for field in fields:
-            field.setStyleSheet("padding:8px; border-radius:6px;")
             layout.addWidget(field)
 
+        # ===== REGISZTRÁCIÓ GOMB =====
         self.register_btn = QPushButton("Regisztráció")
         self.register_btn.setStyleSheet("""
             background-color: #16a34a;
@@ -100,6 +120,7 @@ class RegisterView(QWidget):
         container.addWidget(self.card)
         self.setLayout(container)
 
+    # ===== AVATAR =====
     def select_avatar(self):
         path, _ = QFileDialog.getOpenFileName(
             self, "Profilkép", "", "Images (*.png *.jpg *.jpeg)"
@@ -109,15 +130,20 @@ class RegisterView(QWidget):
             avatar = create_round_avatar(path, 120)
             self.avatar_preview.setPixmap(avatar)
 
+    # ===== REGISZTRÁCIÓ =====
     def register_user(self):
+
+        # TELEFON VALIDÁCIÓ
+        if not self.phone.hasAcceptableInput():
+            Toast(self.main_window, "Hibás telefonszám! (+XX XX XXX XXXX)", success=False).show_toast()
+            return
+
         if not self.email.text().strip():
-            toast = Toast(self.main_window, "Az email megadása kötelező!", success=False)
-            toast.show_toast()
+            Toast(self.main_window, "Az email megadása kötelező!", success=False).show_toast()
             return
 
         if not self.password.text().strip():
-            toast = Toast(self.main_window, "A jelszó megadása kötelező!", success=False)
-            toast.show_toast()
+            Toast(self.main_window, "A jelszó megadása kötelező!", success=False).show_toast()
             return
 
         session = SessionLocal()
@@ -128,11 +154,11 @@ class RegisterView(QWidget):
         ).first()
 
         if existing_user:
-            toast = Toast(self.main_window, "Az email már létezik!", success=False)
-            toast.show_toast()
+            Toast(self.main_window, "Az email már létezik!", success=False).show_toast()
             session.close()
             return
 
+        # USER LÉTREHOZÁS
         user = User(
             first_name=self.first_name.text().strip(),
             last_name=self.last_name.text().strip(),
@@ -154,20 +180,15 @@ class RegisterView(QWidget):
 
         saved_email = self.email.text().strip()
 
-        toast = Toast(self.main_window, "Sikeres regisztráció!", success=True)
-        toast.show_toast()
+        Toast(self.main_window, "Sikeres regisztráció!", success=True).show_toast()
 
-        # Átváltás login oldalra
+        # ÁTVÁLT LOGINRA
         self.main_window.stack.setCurrentWidget(self.main_window.login_page)
 
-        # Email automatikus kitöltése login mezőben
         self.main_window.login_page.email.setText(saved_email)
-
-        # Jelszó mező ürítése biztonság miatt
         self.main_window.login_page.password.clear()
 
-
-        # Űrlap törlése
+        # ŰRLAP törlés
         self.first_name.clear()
         self.last_name.clear()
         self.email.clear()

@@ -3,7 +3,8 @@ from PySide6.QtWidgets import (
     QLabel, QLineEdit, QPushButton,
     QFileDialog, QGridLayout
 )
-from PySide6.QtCore import Qt
+from PySide6.QtGui import QIntValidator, QRegularExpressionValidator
+from PySide6.QtCore import Qt, QRegularExpression
 
 from core.session_manager import SessionManager
 from core.image_utils import create_round_avatar
@@ -35,6 +36,18 @@ class ProfileView(QWidget):
         layout.setSpacing(60)
 
         # ======================
+        # VALIDÁTOROK
+        # ======================
+
+        text_regex = QRegularExpression("^[A-Za-zÁÉÍÓÖŐÚÜŰáéíóöőúüű ]+$")
+        text_validator = QRegularExpressionValidator(text_regex)
+
+        number_validator = QIntValidator()
+
+        phone_regex = QRegularExpression(r"^\+\d{2} \d{2} \d{3} \d{4}$")
+        phone_validator = QRegularExpressionValidator(phone_regex)
+
+        # ======================
         # AVATAR
         # ======================
 
@@ -57,16 +70,42 @@ class ProfileView(QWidget):
         right = QGridLayout()
         right.setSpacing(15)
 
-        self.first_name = QLineEdit()
-        self.last_name = QLineEdit()
-        self.email = QLineEdit()
-        self.phone = QLineEdit()
+        def create_input(placeholder=""):
+            field = QLineEdit()
+            field.setPlaceholderText(placeholder)
+            field.setStyleSheet("padding:8px; border-radius:6px;")
+            return field
 
-        self.country = QLineEdit()
-        self.zip_code = QLineEdit()
-        self.city = QLineEdit()
-        self.street = QLineEdit()
-        self.house_number = QLineEdit()
+        self.first_name = create_input("Vezetéknév")
+        self.last_name = create_input("Keresztnév")
+        self.email = create_input("Email")
+        self.phone = create_input("Telefonszám: +36 70 000 0000")
+
+        self.country = create_input("Ország")
+        self.zip_code = create_input("Irányítószám")
+        self.city = create_input("Város")
+        self.street = create_input("Utca")
+        self.house_number = create_input("Házszám")
+
+        # ===== VALIDÁTOROK =====
+        for f in [self.first_name, self.last_name, self.country, self.city, self.street]:
+            f.setValidator(text_validator)
+
+        for f in [self.zip_code, self.house_number]:
+            f.setValidator(number_validator)
+
+        self.phone.setValidator(phone_validator)
+
+        # ===== MAX LENGTH =====
+        self.first_name.setMaxLength(50)
+        self.last_name.setMaxLength(50)
+        self.country.setMaxLength(50)
+        self.city.setMaxLength(50)
+        self.street.setMaxLength(100)
+
+        self.zip_code.setMaxLength(4)
+        self.house_number.setMaxLength(10)
+        self.phone.setMaxLength(16)
 
         fields = [
             ("Vezetéknév:", self.first_name),
@@ -99,7 +138,6 @@ class ProfileView(QWidget):
         layout.addLayout(right)
 
         self.card.setLayout(layout)
-
         container.addWidget(self.card)
         self.setLayout(container)
 
@@ -160,8 +198,7 @@ class ProfileView(QWidget):
         self.load_user()
         self.main_window.update_navbar()
 
-        toast = Toast(self.main_window, "Profilkép frissítve!", True)
-        toast.show_toast()
+        Toast(self.main_window, "Profilkép frissítve!", True).show_toast()
 
     # ======================
     # ADATOK MENTÉSE
@@ -169,14 +206,15 @@ class ProfileView(QWidget):
 
     def save_changes(self):
 
+        # TELEFON VALIDÁCIÓ
+        if not self.phone.hasAcceptableInput():
+            Toast(self.main_window, "Hibás telefonszám! (+XX XX XXX XXXX)", False).show_toast()
+            return
+
         session = SessionLocal()
         current = SessionManager.instance().get_user()
 
         user = session.query(User).filter_by(id=current.id).first()
-
-        # ======================
-        # VÁLTOZÁS ELLENŐRZÉS
-        # ======================
 
         if (
             user.first_name == self.first_name.text() and
@@ -188,18 +226,11 @@ class ProfileView(QWidget):
             user.street == self.street.text() and
             user.house_number == self.house_number.text()
         ):
-
             session.close()
-
-            toast = Toast(self.main_window, "Nincs módosítás.", False)
-            toast.show_toast()
-
+            Toast(self.main_window, "Nincs módosítás.", False).show_toast()
             return
 
-        # ======================
         # MENTÉS
-        # ======================
-
         user.first_name = self.first_name.text()
         user.last_name = self.last_name.text()
         user.phone = self.phone.text()
@@ -211,7 +242,7 @@ class ProfileView(QWidget):
 
         session.commit()
 
-        # SessionManager frissítés
+        # Session frissítés
         SessionManager.instance()._user.first_name = user.first_name
         SessionManager.instance()._user.last_name = user.last_name
         SessionManager.instance()._user.phone = user.phone
@@ -225,5 +256,4 @@ class ProfileView(QWidget):
 
         self.main_window.update_navbar()
 
-        toast = Toast(self.main_window, "Adatok sikeresen mentve!", True)
-        toast.show_toast()
+        Toast(self.main_window, "Adatok sikeresen mentve!", True).show_toast()
