@@ -28,12 +28,8 @@ class BookingView(QWidget):
         title = QLabel("Foglalások")
         title.setStyleSheet("color: white; font-size: 18px; font-weight: bold;")
 
-        self.refresh_btn = QPushButton("🔄 Frissítés")
-        self.refresh_btn.clicked.connect(self.load_data)
-
         toolbar.addWidget(title)
         toolbar.addStretch()
-        toolbar.addWidget(self.refresh_btn)
 
         layout.addLayout(toolbar)
 
@@ -75,12 +71,9 @@ class BookingView(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.verticalHeader().setVisible(False)
-
-        # FONTOS FIXEK
         self.table.verticalHeader().setDefaultSectionSize(50)
 
         layout.addWidget(self.table)
-
         self.setLayout(layout)
 
         self.load_data()
@@ -107,7 +100,7 @@ class BookingView(QWidget):
             session.close()
             return
 
-        # visszaállítjuk oszlopokat
+        # ==== TABLE ====
         self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels([
             "Név", "Telefon", "Utánfutó", "Foglalás", "Időszak", "Létrehozva", "Művelet"
@@ -165,7 +158,6 @@ class BookingView(QWidget):
                 background-color: #4b5563;
             }
             """)
-            
             edit_btn.clicked.connect(
                 lambda _, bid=b.id: self.edit_booking(bid)
             )
@@ -194,10 +186,13 @@ class BookingView(QWidget):
             )
 
             container = QWidget()
+            container.setAttribute(Qt.WA_StyledBackground, False)
+            container.setAutoFillBackground(False)
+            container.setStyleSheet("background: transparent; ")
+            
             btn_layout = QHBoxLayout()
             btn_layout.setContentsMargins(10, 5, 10, 5)
             btn_layout.setSpacing(10)
-            btn_layout.setAlignment(Qt.AlignCenter)
 
             btn_layout.addWidget(edit_btn)
             btn_layout.addWidget(delete_btn)
@@ -226,7 +221,7 @@ class BookingView(QWidget):
         self.load_data()
 
     # ======================
-    # EDIT (placeholder)
+    # Szerkesztés
     # ======================
     def edit_booking(self, booking_id):
         session = SessionLocal()
@@ -238,7 +233,32 @@ class BookingView(QWidget):
 
         dialog = QDialog(self)
         dialog.setWindowTitle("Foglalás szerkesztése")
-        dialog.setFixedWidth(300)
+        dialog.setFixedWidth(320)
+
+        dialog.setStyleSheet("""
+        QDialog {
+            background-color: #1f2937;
+            color: white;
+            border-radius: 12px;
+        }
+
+        QLabel {
+            color: #d1d5db;
+        }
+
+        QComboBox, QDateEdit {
+            background-color: #111827;
+            color: white;
+            padding: 6px;
+            border-radius: 6px;
+            border: 1px solid #374151;
+        }
+
+        QPushButton {
+            border-radius: 8px;
+            padding: 8px;
+        }
+        """)
 
         layout = QFormLayout()
 
@@ -257,10 +277,27 @@ class BookingView(QWidget):
 
         # ===== GOMBOK =====
         save_btn = QPushButton("Mentés")
-        save_btn.setStyleSheet("background-color:#16a34a; color:white; padding:6px;")
+        save_btn.setStyleSheet("""
+        QPushButton {
+            background-color: #16a34a;
+            color: white;
+        }
+        QPushButton:hover {
+            background-color: #15803d;
+        }
+        """)
 
         cancel_btn = QPushButton("Mégse")
-
+        cancel_btn.setStyleSheet("""
+        QPushButton {
+            background-color: #374151;
+            color: white;
+        }
+        QPushButton:hover {
+            background-color: #4b5563;
+        }
+        """)
+        
         btn_layout = QHBoxLayout()
         btn_layout.addWidget(save_btn)
         btn_layout.addWidget(cancel_btn)
@@ -269,7 +306,7 @@ class BookingView(QWidget):
 
         dialog.setLayout(layout)
 
-        # ===== SAVE =====
+        # ===== Mentés =====
         def save():
             booking.booking_date = date_edit.date().toPython()
             booking.period = period_select.currentText()

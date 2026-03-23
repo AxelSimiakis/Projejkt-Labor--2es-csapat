@@ -80,23 +80,36 @@ class AvailabilityCalendar(QCalendarWidget):
 
     def paintCell(self, painter: QPainter, rect: QRect, qdate: QDate):
         py_date = date(qdate.year(), qdate.month(), qdate.day())
+        today = date.today()
         state = self.availability_map.get(py_date, "free")
 
         painter.save()
+        #ElMÚLT NAPOK → SZÜRKE
+        if py_date <= today:
+            painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#6b7280"))
+        
+        diff = (py_date - today).days
 
-        if state == "full":
-            painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#dc2626"))
-        elif state == "partial":
-            painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#f59e0b"))
-        elif state == "free":
-            painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#16a34a"))
+        if diff <= 2:
+            painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#6b7280"))
+        
+        else:
+            if state == "full":
+                painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#dc2626"))
+            elif state == "partial":
+                painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#f59e0b"))
+            else:
+                painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#16a34a"))
 
+        # kijelölés kerete
         if qdate == self.selectedDate():
             pen = QPen(QColor("#ffffff"))
             pen.setWidth(2)
             painter.setPen(pen)
             painter.drawRect(rect.adjusted(1, 1, -2, -2))
 
+        # szöveg szín
+        painter.setPen(QColor("#e5e7eb"))
         painter.setPen(QColor("white"))
         painter.drawText(rect, Qt.AlignCenter, str(qdate.day()))
 
@@ -456,6 +469,9 @@ class TrailerListView(QWidget):
             last_day
         )
         self.calendar.set_availability_map(availability_map)
+        
+        self.calendar.updateCells()
+        self.calendar.repaint()
 
     def clear_availability_labels(self):
         self.availability_morning.setText("Délelőtt: -")
@@ -494,6 +510,30 @@ class TrailerListView(QWidget):
 
         booking_date = self.get_selected_booking_date()
         period = self.period_combo.currentData()
+
+        today = date.today()
+
+        #USER KORLÁTOZÁS
+        if user.role == "user":
+            diff = (booking_date - today).days
+
+            # múlt tiltás
+            if booking_date <= today:
+                Toast(
+                    self.main_window or self,
+                    "Múltbeli dátum nem választható!",
+                    success=False
+                ).show_toast()
+                return
+            # 3 napos limit
+            
+            if diff <= 2:
+                Toast(
+                    self.main_window or self,
+                    "Csak a helyszínen személyesen, telefonon érdeklődjön!",
+                    success=False
+                ).show_toast()
+                return
 
         try:
             create_booking(user.id, self.selected_trailer.id, booking_date, period)

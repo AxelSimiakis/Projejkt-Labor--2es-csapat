@@ -13,6 +13,7 @@ from views.register_view import RegisterView
 from views.profile_view import ProfileView
 from views.user_view import UserView
 from views.booking_view import BookingView
+from views.technical_view import TechnicalView
 from core.session_manager import SessionManager
 from core.image_utils import create_round_avatar
 
@@ -51,7 +52,8 @@ class MainWindow(QMainWindow):
         self.profile_page = ProfileView(self)
         self.booking_page = BookingView(self)
         self.user_page = UserView(self)
-
+        self.technical_page = TechnicalView(self)
+        
 
         self.stack.addWidget(self.home_page)
         self.stack.addWidget(self.login_page)
@@ -60,6 +62,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.profile_page)
         self.stack.addWidget(self.booking_page)
         self.stack.addWidget(self.user_page)
+        self.stack.addWidget(self.technical_page)
 
         self.main_layout.addWidget(self.stack)
 
@@ -161,6 +164,13 @@ class MainWindow(QMainWindow):
                 bookings_btn = QPushButton("Foglalások")
                 bookings_btn.clicked.connect(self.open_bookings)
                 self.nav_layout.addWidget(bookings_btn)
+                
+            if role in ["admin", "employee"]:
+                tech_btn = QPushButton("Kezelés")
+                tech_btn.clicked.connect(
+                    lambda: self.stack.setCurrentWidget(self.technical_page)
+                )
+                self.nav_layout.addWidget(tech_btn)
 
             if role == "admin":
                 users_btn = QPushButton("Felhasználók")
