@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QHBoxLayout, QHeaderView,
-    QLabel, QAbstractItemView, QDialog, 
+    QLabel, QAbstractItemView, QDialog,
     QFormLayout, QComboBox, QDateEdit
 )
 from PySide6.QtCore import Qt, QDate
@@ -42,7 +42,6 @@ class BookingView(QWidget):
             "Név", "Telefon", "Utánfutó", "Dátum", "Időszak", "Művelet"
         ])
 
-        # STYLE
         self.table.setStyleSheet("""
         QTableWidget {
             background-color: #1f2937;
@@ -136,12 +135,10 @@ class BookingView(QWidget):
             self.table.setItem(row, 3, QTableWidgetItem(str(b.booking_date)))
             self.table.setItem(row, 4, QTableWidgetItem(b.period))
             self.table.setItem(row, 5, QTableWidgetItem(str(b.created_at)[:16]))
-            
 
             # ======================
             # GOMBOK
             # ======================
-
             edit_btn = QPushButton("Szerkesztés")
             edit_btn.setFixedHeight(30)
             edit_btn.setMinimumWidth(100)
@@ -188,8 +185,8 @@ class BookingView(QWidget):
             container = QWidget()
             container.setAttribute(Qt.WA_StyledBackground, False)
             container.setAutoFillBackground(False)
-            container.setStyleSheet("background: transparent; ")
-            
+            container.setStyleSheet("background: transparent;")
+
             btn_layout = QHBoxLayout()
             btn_layout.setContentsMargins(10, 5, 10, 5)
             btn_layout.setSpacing(10)
@@ -221,8 +218,9 @@ class BookingView(QWidget):
         self.load_data()
 
     # ======================
-    # Szerkesztés
+    # SZERKESZTÉS
     # ======================
+
     def edit_booking(self, booking_id):
         session = SessionLocal()
         booking = session.get(Booking, booking_id)
@@ -243,7 +241,9 @@ class BookingView(QWidget):
         }
 
         QLabel {
-            color: #d1d5db;
+            color: white;
+            font-size: 13px;
+            background: transparent;
         }
 
         QComboBox, QDateEdit {
@@ -254,6 +254,10 @@ class BookingView(QWidget):
             border: 1px solid #374151;
         }
 
+        QComboBox:focus, QDateEdit:focus {
+            border: 1px solid #16a34a;
+        }
+
         QPushButton {
             border-radius: 8px;
             padding: 8px;
@@ -261,6 +265,8 @@ class BookingView(QWidget):
         """)
 
         layout = QFormLayout()
+        layout.setSpacing(12)
+        layout.setContentsMargins(12, 12, 12, 12)
 
         # ===== DÁTUM =====
         date_edit = QDateEdit()
@@ -297,7 +303,7 @@ class BookingView(QWidget):
             background-color: #4b5563;
         }
         """)
-        
+
         btn_layout = QHBoxLayout()
         btn_layout.addWidget(save_btn)
         btn_layout.addWidget(cancel_btn)
@@ -306,7 +312,7 @@ class BookingView(QWidget):
 
         dialog.setLayout(layout)
 
-        # ===== Mentés =====
+        # ===== MENTÉS =====
         def save():
             booking.booking_date = date_edit.date().toPython()
             booking.period = period_select.currentText()

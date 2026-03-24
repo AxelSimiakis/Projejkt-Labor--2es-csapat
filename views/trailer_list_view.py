@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QComboBox,
-    QMessageBox,
     QFrame,
     QScrollArea,
     QGridLayout,
@@ -24,6 +23,11 @@ from services.booking_service import (
     get_availability_for_trailer_and_date,
     get_availability_map_for_period,
 )
+from services.favorite_service import (
+    get_favorite_trailer_ids,
+    toggle_favorite,
+)
+from services.cart_service import add_to_cart
 from viewmodels.trailer_list_vm import TrailerListViewModel
 
 
@@ -84,44 +88,41 @@ class AvailabilityCalendar(QCalendarWidget):
         state = self.availability_map.get(py_date, "free")
 
         painter.save()
-        #ElMÚLT NAPOK → SZÜRKE
+
         if py_date <= today:
             painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#6b7280"))
-        
-        diff = (py_date - today).days
-
-        if diff <= 2:
-            painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#6b7280"))
-        
         else:
-            if state == "full":
-                painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#dc2626"))
-            elif state == "partial":
-                painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#f59e0b"))
+            diff = (py_date - today).days
+            if diff <= 2:
+                painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#6b7280"))
             else:
-                painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#16a34a"))
+                if state == "full":
+                    painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#dc2626"))
+                elif state == "partial":
+                    painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#f59e0b"))
+                else:
+                    painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#16a34a"))
 
-        # kijelölés kerete
         if qdate == self.selectedDate():
             pen = QPen(QColor("#ffffff"))
             pen.setWidth(2)
             painter.setPen(pen)
             painter.drawRect(rect.adjusted(1, 1, -2, -2))
 
-        # szöveg szín
-        painter.setPen(QColor("#e5e7eb"))
         painter.setPen(QColor("white"))
         painter.drawText(rect, Qt.AlignCenter, str(qdate.day()))
-
         painter.restore()
 
 
 class TrailerCard(QFrame):
     clicked = Signal(object)
 
-    def __init__(self, trailer):
+    def __init__(self, trailer, is_favorite=False, favorite_callback=None):
         super().__init__()
         self.trailer = trailer
+        self.favorite_callback = favorite_callback
+        self._is_favorite = is_favorite
+
         self.setCursor(Qt.PointingHandCursor)
         self.setObjectName("trailerCard")
         self.setStyleSheet("""
@@ -163,25 +164,79 @@ class TrailerCard(QFrame):
             self.image_label.setText("Nincs kép")
 
         self.name_label = QLabel(trailer.name)
-        self.name_label.setStyleSheet("font-size: 16px; font-weight: bold; color: white;")
+        self.name_label.setStyleSheet("""
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            background: transparent;
+        """)
 
         self.desc_label = QLabel((trailer.description or "Nincs leírás.")[:70])
         self.desc_label.setWordWrap(True)
-        self.desc_label.setStyleSheet("color: #d1d5db; font-size: 12px;")
+        self.desc_label.setStyleSheet("""
+            color: #d1d5db;
+            font-size: 12px;
+            background: transparent;
+        """)
 
         self.price_label = QLabel(
             f"Délelőtt: {trailer.price_morning} Ft\n"
             f"Délután: {trailer.price_afternoon} Ft\n"
             f"Egész nap: {trailer.price_full_day} Ft"
         )
-        self.price_label.setStyleSheet("color: #f3f4f6; font-size: 12px;")
+        self.price_label.setStyleSheet("""
+            color: #f3f4f6;
+            font-size: 12px;
+            background: transparent;
+        """)
+
+        bottom_row = QHBoxLayout()
+        bottom_row.addStretch()
+
+        self.favorite_button = QPushButton()
+        self.favorite_button.setFixedSize(34, 34)
+        self.favorite_button.setCursor(Qt.PointingHandCursor)
+        self.favorite_button.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                color: #fbbf24;
+                font-size: 22px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: rgba(251, 191, 36, 0.08);
+                border-radius: 17px;
+            }
+        """)
+        self.favorite_button.clicked.connect(self.handle_favorite_clicked)
+        bottom_row.addWidget(self.favorite_button)
+
+        self.update_favorite_icon()
 
         layout.addWidget(self.image_label)
         layout.addWidget(self.name_label)
         layout.addWidget(self.desc_label)
         layout.addWidget(self.price_label)
+        layout.addLayout(bottom_row)
+
+    def set_favorite(self, is_favorite: bool):
+        self._is_favorite = is_favorite
+        self.update_favorite_icon()
+
+    def update_favorite_icon(self):
+        self.favorite_button.setText("★" if self._is_favorite else "☆")
+
+    def handle_favorite_clicked(self):
+        if self.favorite_callback:
+            self.favorite_callback(self.trailer)
 
     def mousePressEvent(self, event):
+        child = self.childAt(event.position().toPoint()) if hasattr(event, "position") else self.childAt(event.pos())
+        if child == self.favorite_button:
+            super().mousePressEvent(event)
+            return
+
         self.clicked.emit(self.trailer)
         super().mousePressEvent(event)
 
@@ -193,6 +248,7 @@ class TrailerListView(QWidget):
         self.viewmodel = TrailerListViewModel()
         self.trailers = []
         self.selected_trailer = None
+        self.favorite_ids = set()
 
         self.setWindowTitle("Elérhető utánfutók")
 
@@ -200,14 +256,7 @@ class TrailerListView(QWidget):
         root.setContentsMargins(16, 16, 16, 16)
         root.setSpacing(20)
 
-        # Bal oldal - csempék
         left_wrapper = QFrame()
-        left_wrapper.setStyleSheet("""
-            QFrame {
-                background-color: transparent;
-                border-radius: 12px;
-            }
-        """)
         left_layout = QVBoxLayout(left_wrapper)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(12)
@@ -218,12 +267,7 @@ class TrailerListView(QWidget):
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
-        self.scroll.setStyleSheet("""
-            QScrollArea {
-                border: none;
-                background: transparent;
-            }
-        """)
+        self.scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
 
         self.cards_container = QWidget()
         self.cards_layout = QGridLayout(self.cards_container)
@@ -232,18 +276,11 @@ class TrailerListView(QWidget):
 
         self.scroll.setWidget(self.cards_container)
         left_layout.addWidget(self.scroll)
-
         root.addWidget(left_wrapper, 3)
 
-        # Jobb oldal - scrollozható részletek panel
         self.right_scroll = QScrollArea()
         self.right_scroll.setWidgetResizable(True)
-        self.right_scroll.setStyleSheet("""
-            QScrollArea {
-                border: none;
-                background: transparent;
-            }
-        """)
+        self.right_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
 
         self.right_panel = QFrame()
         self.right_panel.setStyleSheet("""
@@ -291,8 +328,6 @@ class TrailerListView(QWidget):
 
         self.calendar = AvailabilityCalendar()
         self.calendar.setFixedHeight(280)
-        self.calendar.setMinimumHeight(280)
-        self.calendar.setMaximumHeight(280)
         self.calendar.dayClicked.connect(self.on_calendar_day_selected)
         self.calendar.pageChangedManually.connect(self.refresh_calendar_month)
         right_layout.addWidget(self.calendar)
@@ -306,7 +341,7 @@ class TrailerListView(QWidget):
         self.availability_full_day = QLabel("Egész nap: -")
 
         for label in [self.availability_morning, self.availability_afternoon, self.availability_full_day]:
-            label.setStyleSheet("color: white; font-size: 14px;")
+            label.setStyleSheet("color: white; font-size: 14px; background: transparent;")
             right_layout.addWidget(label)
 
         self.period_combo = QComboBox()
@@ -324,6 +359,25 @@ class TrailerListView(QWidget):
         """)
         right_layout.addWidget(self.period_combo)
 
+        actions_row = QHBoxLayout()
+
+        self.favorite_action_button = QPushButton("☆ Kedvenc")
+        self.favorite_action_button.clicked.connect(self.toggle_selected_favorite)
+        self.favorite_action_button.setStyleSheet("""
+            QPushButton {
+                background-color: #374151;
+                color: #fbbf24;
+                padding: 10px;
+                border: none;
+                border-radius: 10px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #4b5563;
+            }
+        """)
+        actions_row.addWidget(self.favorite_action_button, 1)
+
         self.book_button = QPushButton("Foglalás")
         self.book_button.clicked.connect(self.book_selected_trailer)
         self.book_button.setStyleSheet("""
@@ -339,7 +393,9 @@ class TrailerListView(QWidget):
                 background-color: #15803d;
             }
         """)
-        right_layout.addWidget(self.book_button)
+        actions_row.addWidget(self.book_button, 2)
+
+        right_layout.addLayout(actions_row)
 
         self.login_hint = QLabel("")
         self.login_hint.setWordWrap(True)
@@ -361,7 +417,12 @@ class TrailerListView(QWidget):
             if widget:
                 widget.deleteLater()
 
+    def load_favorites(self):
+        user = SessionManager.instance().get_user()
+        self.favorite_ids = get_favorite_trailer_ids(user.id) if user else set()
+
     def load_trailers(self):
+        self.load_favorites()
         self.trailers = self.viewmodel.get_all_trailers()
         self.clear_layout(self.cards_layout)
 
@@ -370,7 +431,11 @@ class TrailerListView(QWidget):
         col = 0
 
         for trailer in self.trailers:
-            card = TrailerCard(trailer)
+            card = TrailerCard(
+                trailer,
+                is_favorite=trailer.id in self.favorite_ids,
+                favorite_callback=self.toggle_trailer_favorite
+            )
             card.clicked.connect(self.select_trailer)
             self.cards_layout.addWidget(card, row, col)
 
@@ -380,7 +445,9 @@ class TrailerListView(QWidget):
                 row += 1
 
         if self.trailers:
-            self.select_trailer(self.trailers[0])
+            current_id = self.selected_trailer.id if self.selected_trailer else None
+            selected = next((t for t in self.trailers if t.id == current_id), self.trailers[0])
+            self.select_trailer(selected)
         else:
             self.selected_trailer = None
             self.name_label.setText("Nincs elérhető utánfutó")
@@ -389,6 +456,7 @@ class TrailerListView(QWidget):
             self.image_label.setPixmap(QPixmap())
             self.image_label.setText("Nincs kép")
             self.selected_date_label.setText("Kiválasztott dátum: -")
+            self.favorite_action_button.setText("☆ Kedvenc")
             self.clear_availability_labels()
 
     def refresh(self):
@@ -399,11 +467,22 @@ class TrailerListView(QWidget):
         is_logged_in = SessionManager.instance().is_authenticated()
         self.book_button.setVisible(is_logged_in)
         self.period_combo.setVisible(is_logged_in)
+        self.favorite_action_button.setVisible(is_logged_in)
 
         if is_logged_in:
             self.login_hint.setText("")
         else:
-            self.login_hint.setText("Foglalni csak bejelentkezés után lehet.")
+            self.login_hint.setText("Foglalni és kedvencekhez adni csak bejelentkezés után lehet.")
+
+    def update_selected_favorite_button(self):
+        if not self.selected_trailer:
+            self.favorite_action_button.setText("☆ Kedvenc")
+            return
+
+        if self.selected_trailer.id in self.favorite_ids:
+            self.favorite_action_button.setText("★ Kedvenc")
+        else:
+            self.favorite_action_button.setText("☆ Kedvenc")
 
     def select_trailer(self, trailer):
         self.selected_trailer = trailer
@@ -417,6 +496,7 @@ class TrailerListView(QWidget):
         )
 
         self.load_trailer_image(getattr(trailer, "image_path", None))
+        self.update_selected_favorite_button()
 
         selected_qdate = self.calendar.selectedDate()
         self.selected_date_label.setText(
@@ -469,9 +549,7 @@ class TrailerListView(QWidget):
             last_day
         )
         self.calendar.set_availability_map(availability_map)
-        
-        self.calendar.updateCells()
-        self.calendar.repaint()
+        self.refresh_day_availability()
 
     def clear_availability_labels(self):
         self.availability_morning.setText("Délelőtt: -")
@@ -496,16 +574,48 @@ class TrailerListView(QWidget):
             f"Egész nap: {'Szabad' if availability['full_day'] else 'Foglalt'}"
         )
 
+    def toggle_trailer_favorite(self, trailer):
+        user = SessionManager.instance().get_user()
+        if not user:
+            Toast(self.main_window or self, "Kedvencekhez adáshoz be kell jelentkezni.", success=False).show_toast()
+            return
+
+        try:
+            now_favorite = toggle_favorite(user.id, trailer.id)
+
+            if now_favorite:
+                self.favorite_ids.add(trailer.id)
+                Toast(self.main_window or self, "Utánfutó hozzáadva a kedvencekhez", success=True).show_toast()
+            else:
+                self.favorite_ids.discard(trailer.id)
+                Toast(self.main_window or self, "Utánfutó eltávolítva a kedvencekből", success=False).show_toast()
+
+            if self.selected_trailer and self.selected_trailer.id == trailer.id:
+                self.update_selected_favorite_button()
+
+            self.load_trailers()
+
+            if hasattr(self.main_window, "favorite_page"):
+                self.main_window.favorite_page.load_data()
+
+        except Exception as exc:
+            Toast(self.main_window or self, f"Hiba történt: {exc}", success=False).show_toast()
+
+    def toggle_selected_favorite(self):
+        if not self.selected_trailer:
+            Toast(self.main_window or self, "Először válassz utánfutót.", success=False).show_toast()
+            return
+
+        self.toggle_trailer_favorite(self.selected_trailer)
+
     def book_selected_trailer(self):
         if self.selected_trailer is None:
-            toast = Toast(self.main_window or self, "Először válassz utánfutót.", success=False)
-            toast.show_toast()
+            Toast(self.main_window or self, "Először válassz utánfutót.", success=False).show_toast()
             return
 
         user = SessionManager.instance().get_user()
         if not user:
-            toast = Toast(self.main_window or self, "Foglaláshoz be kell jelentkezni.", success=False)
-            toast.show_toast()
+            Toast(self.main_window or self, "Foglaláshoz be kell jelentkezni.", success=False).show_toast()
             return
 
         booking_date = self.get_selected_booking_date()
@@ -513,11 +623,9 @@ class TrailerListView(QWidget):
 
         today = date.today()
 
-        #USER KORLÁTOZÁS
         if user.role == "user":
             diff = (booking_date - today).days
 
-            # múlt tiltás
             if booking_date <= today:
                 Toast(
                     self.main_window or self,
@@ -525,8 +633,7 @@ class TrailerListView(QWidget):
                     success=False
                 ).show_toast()
                 return
-            # 3 napos limit
-            
+
             if diff <= 2:
                 Toast(
                     self.main_window or self,
@@ -536,22 +643,19 @@ class TrailerListView(QWidget):
                 return
 
         try:
-            create_booking(user.id, self.selected_trailer.id, booking_date, period)
+            add_to_cart(user.id, self.selected_trailer.id, booking_date, period)
 
-            self.refresh_calendar_month(booking_date.year, booking_date.month)
-            self.refresh_day_availability()
-
-            toast = Toast(
+            Toast(
                 self.main_window or self,
-                f"Sikeres foglalás: {self.selected_trailer.name} - {booking_date.strftime('%Y.%m.%d.')}",
+                f"A tétel bekerült a kosárba: {self.selected_trailer.name} - {booking_date.strftime('%Y.%m.%d.')}",
                 success=True
-            )
-            toast.show_toast()
+            ).show_toast()
+
+            if hasattr(self.main_window, "cart_page"):
+                self.main_window.cart_page.load_data()
 
         except ValueError as exc:
-            toast = Toast(self.main_window or self, str(exc), success=False)
-            toast.show_toast()
+            Toast(self.main_window or self, str(exc), success=False).show_toast()
 
         except Exception as exc:
-            toast = Toast(self.main_window or self, f"Váratlan hiba történt: {exc}", success=False)
-            toast.show_toast()
+            Toast(self.main_window or self, f"Váratlan hiba történt: {exc}", success=False).show_toast()

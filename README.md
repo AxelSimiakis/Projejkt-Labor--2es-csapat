@@ -66,6 +66,7 @@ pip install -r requirements.txt
 
 ### Minta adatok betöltése
 
+python init_db.py
 python -m seed.seed_users
 python -m seed.seed_trailers
 python -m seed.seed_bookings

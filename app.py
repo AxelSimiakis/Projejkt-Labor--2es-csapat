@@ -14,6 +14,9 @@ from views.profile_view import ProfileView
 from views.user_view import UserView
 from views.booking_view import BookingView
 from views.technical_view import TechnicalView
+from views.favorite_view import FavoriteView
+from views.cart_view import CartView
+from views.my_bookings_view import MyBookingsView
 from core.session_manager import SessionManager
 from core.image_utils import create_round_avatar
 
@@ -53,7 +56,9 @@ class MainWindow(QMainWindow):
         self.booking_page = BookingView(self)
         self.user_page = UserView(self)
         self.technical_page = TechnicalView(self)
-        
+        self.favorite_page = FavoriteView(self)
+        self.cart_page = CartView(self)
+        self.my_bookings_page = MyBookingsView(self)
 
         self.stack.addWidget(self.home_page)
         self.stack.addWidget(self.login_page)
@@ -63,6 +68,9 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.booking_page)
         self.stack.addWidget(self.user_page)
         self.stack.addWidget(self.technical_page)
+        self.stack.addWidget(self.favorite_page)
+        self.stack.addWidget(self.cart_page)
+        self.stack.addWidget(self.my_bookings_page)
 
         self.main_layout.addWidget(self.stack)
 
@@ -102,8 +110,44 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentWidget(self.home_page)
 
     def go_to_trailers(self):
-        self.trailer_page.refresh()
+        if hasattr(self.trailer_page, "refresh"):
+            self.trailer_page.refresh()
         self.stack.setCurrentWidget(self.trailer_page)
+
+    def open_bookings(self):
+        if hasattr(self.booking_page, "load_data"):
+            self.booking_page.load_data()
+        self.stack.setCurrentWidget(self.booking_page)
+
+    def open_my_bookings(self):
+        if hasattr(self.my_bookings_page, "load_data"):
+            self.my_bookings_page.load_data()
+        self.stack.setCurrentWidget(self.my_bookings_page)
+
+    def open_users(self):
+        if hasattr(self.user_page, "load_data"):
+            self.user_page.load_data()
+        self.stack.setCurrentWidget(self.user_page)
+
+    def open_favorites(self):
+        if hasattr(self.favorite_page, "load_data"):
+            self.favorite_page.load_data()
+        self.stack.setCurrentWidget(self.favorite_page)
+
+    def open_cart(self):
+        if hasattr(self.cart_page, "load_data"):
+            self.cart_page.load_data()
+        self.stack.setCurrentWidget(self.cart_page)
+
+    def open_profile(self):
+        if hasattr(self.profile_page, "load_user"):
+            self.profile_page.load_user()
+        self.stack.setCurrentWidget(self.profile_page)
+
+    def open_technical(self):
+        if hasattr(self.technical_page, "load_data"):
+            self.technical_page.load_data()
+        self.stack.setCurrentWidget(self.technical_page)
 
     def update_navbar(self):
         while self.nav_layout.count():
@@ -139,69 +183,79 @@ class MainWindow(QMainWindow):
 
             self.nav_layout.addWidget(register_btn)
             self.nav_layout.addWidget(login_btn)
-        else:
-            user = session.get_user()
-            role = user.role
+            return
 
-            avatar_btn = QPushButton()
-            avatar_btn.setFixedSize(40, 40)
-            avatar_btn.setCursor(Qt.PointingHandCursor)
-            avatar_btn.setStyleSheet("""
-                border-radius: 20px;
-                border: none;
-            """)
-            avatar_btn.clicked.connect(self.open_profile)
+        user = session.get_user()
+        role = user.role if user else None
 
-            if user and user.profile_image_path:
-                avatar = create_round_avatar(user.profile_image_path, 40)
-                avatar_btn.setIcon(avatar)
-                avatar_btn.setIconSize(avatar_btn.size())
+        avatar_btn = QPushButton()
+        avatar_btn.setFixedSize(40, 40)
+        avatar_btn.setCursor(Qt.PointingHandCursor)
+        avatar_btn.setStyleSheet("""
+            border-radius: 20px;
+            border: none;
+        """)
+        avatar_btn.clicked.connect(self.open_profile)
 
-            self.nav_layout.addWidget(avatar_btn)
+        if user and getattr(user, "profile_image_path", None):
+            avatar = create_round_avatar(user.profile_image_path, 40)
+            avatar_btn.setIcon(avatar)
+            avatar_btn.setIconSize(avatar_btn.size())
 
-            # ===== ADMIN / EMPLOYEE GOMBOK =====
-            if role in ["admin", "employee"]:
-                bookings_btn = QPushButton("Foglalások")
-                bookings_btn.clicked.connect(self.open_bookings)
-                self.nav_layout.addWidget(bookings_btn)
-                
-            if role in ["admin", "employee"]:
-                tech_btn = QPushButton("Kezelés")
-                tech_btn.clicked.connect(
-                    lambda: self.stack.setCurrentWidget(self.technical_page)
-                )
-                self.nav_layout.addWidget(tech_btn)
+        self.nav_layout.addWidget(avatar_btn)
 
-            if role == "admin":
-                users_btn = QPushButton("Felhasználók")
-                users_btn.clicked.connect(self.open_users)
-                self.nav_layout.addWidget(users_btn)
+        if role in ["admin", "employee"]:
+            bookings_btn = QPushButton("Foglalások")
+            bookings_btn.clicked.connect(self.open_bookings)
+            self.nav_layout.addWidget(bookings_btn)
 
-            # ===== ALAP GOMBOK =====
-            profile_btn = QPushButton("Adataim")
-            profile_btn.clicked.connect(self.open_profile)
-            self.nav_layout.addWidget(profile_btn)
+        if role == "user":
+            my_bookings_btn = QPushButton("Foglalások")
+            my_bookings_btn.clicked.connect(self.open_my_bookings)
+            self.nav_layout.addWidget(my_bookings_btn)
 
-            logout_btn = QPushButton("Kilépés")
-            logout_btn.clicked.connect(self.handle_logout)
-            self.nav_layout.addWidget(logout_btn)
-    
-    
-    def open_bookings(self):
-        self.booking_page.load_data()
-        self.stack.setCurrentWidget(self.booking_page)
+        if role in ["admin", "employee"]:
+            tech_btn = QPushButton("Kezelés")
+            tech_btn.clicked.connect(self.open_technical)
+            self.nav_layout.addWidget(tech_btn)
 
-    def open_users(self):
-        self.user_page.load_data()
-        self.stack.setCurrentWidget(self.user_page)
+        if role == "admin":
+            users_btn = QPushButton("Felhasználók")
+            users_btn.clicked.connect(self.open_users)
+            self.nav_layout.addWidget(users_btn)
 
-    def open_profile(self):
-        self.profile_page.load_user()
-        self.stack.setCurrentWidget(self.profile_page)
+        favorites_btn = QPushButton("Kedvencek")
+        favorites_btn.clicked.connect(self.open_favorites)
+        self.nav_layout.addWidget(favorites_btn)
+
+        if role == "user":
+            cart_btn = QPushButton("Kosár")
+            cart_btn.clicked.connect(self.open_cart)
+            self.nav_layout.addWidget(cart_btn)
+
+        profile_btn = QPushButton("Adataim")
+        profile_btn.clicked.connect(self.open_profile)
+        self.nav_layout.addWidget(profile_btn)
+
+        logout_btn = QPushButton("Kilépés")
+        logout_btn.clicked.connect(self.handle_logout)
+        self.nav_layout.addWidget(logout_btn)
 
     def handle_logout(self):
         SessionManager.instance().logout()
-        self.trailer_page.refresh()
+
+        if hasattr(self.trailer_page, "refresh"):
+            self.trailer_page.refresh()
+
+        if hasattr(self.favorite_page, "load_data"):
+            self.favorite_page.load_data()
+
+        if hasattr(self.cart_page, "load_data"):
+            self.cart_page.load_data()
+
+        if hasattr(self.my_bookings_page, "load_data"):
+            self.my_bookings_page.load_data()
+
         self.update_navbar()
         self.go_to_home()
 
