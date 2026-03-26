@@ -26,7 +26,21 @@ class TechnicalView(QWidget):
 
         add_btn = QPushButton("+ Új utánfutó")
         add_btn.clicked.connect(self.create_trailer)
-
+        add_btn.setCursor(Qt.PointingHandCursor)
+        add_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #16a34a;
+                    color: white;
+                    border-radius: 8px;
+                    padding: 8px 14px;
+                    font-size: 13px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #15803d;
+                }
+                """)
+        
         toolbar.addWidget(title)
         toolbar.addStretch()
         toolbar.addWidget(add_btn)
@@ -76,13 +90,13 @@ class TechnicalView(QWidget):
         self.load_data()
 
     # ======================
-    # REFRESH
+    # Frissités
     # ======================
     def refresh(self):
         self.load_data()
 
     # ======================
-    # LOAD
+    # Adatokok kezelése
     # ======================
     def load_data(self):
         session = SessionLocal()
@@ -152,7 +166,7 @@ class TechnicalView(QWidget):
         session.close()
 
     # ======================
-    # CREATE
+    # Új Utánfutó
     # ======================
     def create_trailer(self):
         dialog = QDialog(self)
@@ -232,7 +246,7 @@ class TechnicalView(QWidget):
         dialog.exec()
 
     # ======================
-    # DELETE
+    # Törlés
     # ======================
     def delete_trailer(self, trailer_id):
         session = SessionLocal()
@@ -247,7 +261,7 @@ class TechnicalView(QWidget):
         self.load_data()
 
     # ======================
-    # EDIT
+    # Szerkesztés
     # ======================
     def edit_trailer(self, trailer_id):
         session = SessionLocal()
