@@ -215,7 +215,7 @@ class MainWindow(QMainWindow):
             self.nav_layout.addWidget(my_bookings_btn)
 
         if role in ["admin", "employee"]:
-            tech_btn = QPushButton("Kezelés")
+            tech_btn = QPushButton("Utánfutók")
             tech_btn.clicked.connect(self.open_technical)
             self.nav_layout.addWidget(tech_btn)
 
