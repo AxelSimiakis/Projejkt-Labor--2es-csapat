@@ -373,6 +373,7 @@ class UserView(QWidget):
 
         first = QLineEdit(user.first_name or "")
         last = QLineEdit(user.last_name or "")
+        email = QLineEdit(user.email or "")
         phone = QLineEdit(user.phone or "")
         country = QLineEdit(user.country or "")
         city = QLineEdit(user.city or "")
@@ -386,6 +387,7 @@ class UserView(QWidget):
 
         layout.addRow("Vezetéknév:", first)
         layout.addRow("Keresztnév:", last)
+        layout.addRow("Email:", email)
         layout.addRow("Telefon:", phone)
         layout.addRow("Ország:", country)
         layout.addRow("Város:", city)
@@ -409,6 +411,7 @@ class UserView(QWidget):
         def do_save():
             user.first_name = first.text()
             user.last_name = last.text()
+            user.email = email.text()
             user.phone = phone.text()
             user.country = country.text()
             user.city = city.text()

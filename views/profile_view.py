@@ -219,6 +219,7 @@ class ProfileView(QWidget):
         if (
             user.first_name == self.first_name.text() and
             user.last_name == self.last_name.text() and
+            user.email == self.email.text() and
             user.phone == self.phone.text() and
             user.country == self.country.text() and
             user.zip_code == self.zip_code.text() and
@@ -233,6 +234,7 @@ class ProfileView(QWidget):
         # MENTÉS
         user.first_name = self.first_name.text()
         user.last_name = self.last_name.text()
+        user.email = self.email.text()
         user.phone = self.phone.text()
         user.country = self.country.text()
         user.zip_code = self.zip_code.text()
@@ -245,6 +247,7 @@ class ProfileView(QWidget):
         # Session frissítés
         SessionManager.instance()._user.first_name = user.first_name
         SessionManager.instance()._user.last_name = user.last_name
+        SessionManager.instance()._user.email = user.email
         SessionManager.instance()._user.phone = user.phone
         SessionManager.instance()._user.country = user.country
         SessionManager.instance()._user.zip_code = user.zip_code

@@ -169,7 +169,7 @@ class MainWindow(QMainWindow):
         logo_btn.clicked.connect(self.go_to_home)
 
         home_btn = QPushButton("Főoldal")
-        trailers_btn = QPushButton("Utánfutók")
+        trailers_btn = QPushButton("Utánfutó foglalás")
 
         home_btn.clicked.connect(self.go_to_home)
         trailers_btn.clicked.connect(self.go_to_trailers)

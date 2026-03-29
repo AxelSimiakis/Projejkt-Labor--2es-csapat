@@ -82,6 +82,24 @@ def run():
             created_at=datetime.now(UTC),
         )
 
+        create_user_if_not_exists(
+            session,
+            email="rohrertamas@gmail.com",
+            password_hash=hash_password("tamas"),
+            first_name="Rohrer",
+            last_name="Tamás",
+            phone="+06 30 123 4567",
+            country="Magyarország",
+            zip_code="8200",
+            city="Veszprém",
+            street="Egyetem utca",
+            house_number="12",
+            profile_image_path="assets/RohrerTamas.jpg",
+            role="user",
+            created_at=datetime.now(UTC),
+        )
+
+
         session.commit()
         print("A seed_users sikeresen lefutott.")
     except Exception as e:

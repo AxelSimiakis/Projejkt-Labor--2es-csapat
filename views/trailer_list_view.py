@@ -92,17 +92,13 @@ class AvailabilityCalendar(QCalendarWidget):
         if py_date <= today:
             painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#6b7280"))
         else:
-            diff = (py_date - today).days
-            if diff <= 2:
-                painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#6b7280"))
-            else:
                 if state == "full":
                     painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#dc2626"))
                 elif state == "partial":
                     painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#f59e0b"))
                 else:
                     painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#16a34a"))
-
+            
         if qdate == self.selectedDate():
             pen = QPen(QColor("#ffffff"))
             pen.setWidth(2)

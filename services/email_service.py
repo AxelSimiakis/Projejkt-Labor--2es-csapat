@@ -6,7 +6,7 @@ from email.message import EmailMessage
 # SMTP BEÁLLÍTÁSOK
 # =========================================
 # Gmail: potkocsipont@gmail.com
-# Jelszzo: Potkocsipont1234!!
+# Jelszo: Potkocsipont1234!!
 # App jelsó: yubb kiri xurd oixk    --> Kódban nem kell szóköz
 
 SMTP_HOST = "smtp.gmail.com"
@@ -136,7 +136,14 @@ def send_booking_confirmation_email(
     msg.set_content(text_body)
     msg.add_alternative(html_body, subtype="html")
 
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
-        server.starttls()
-        server.login(SMTP_USER, SMTP_PASSWORD)
-        server.send_message(msg)
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.send_message(msg)
+            
+    except Exception as e:
+        print("EMAIL HIBA:", e)
+    
