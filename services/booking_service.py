@@ -1,7 +1,10 @@
-from datetime import date
+from datetime import date, timedelta
 
 from database import SessionLocal
 from models.booking import Booking
+from models.user import User
+from services.email_service import send_booking_cancellation_email
+
 
 FULL_DAY = "full_day"
 MORNING = "morning"
@@ -146,6 +149,45 @@ def create_booking(user_id: int, trailer_id: int, booking_date: date, period: st
         session.commit()
         session.refresh(booking)
         return booking
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+def cancel_booking(booking_id: int, user_id: int):
+    session = SessionLocal()
+    try:
+        booking = session.query(Booking).filter_by(id=booking_id, user_id=user_id).first()
+
+        if not booking:
+            raise ValueError("Foglalás nem található.")
+
+        today = date.today()
+
+        # ❌ ha 5 napon belül van
+        if booking.booking_date <= today + timedelta(days=5):
+            raise ValueError("A foglalás már nem mondható le (5 napon belül).")
+
+        # adatok emailhez
+        trailer_name = booking.trailer.name if booking.trailer else f"#{booking.trailer_id}"
+
+        session.delete(booking)
+        session.commit()
+
+        # email
+        user = session.query(User).filter_by(id=user_id).first()
+        if user and user.email:
+            send_booking_cancellation_email(
+                recipient_email=user.email,
+                recipient_name=user.first_name or user.email,
+                trailer_name=trailer_name,
+                booking_date=booking.booking_date,
+                period=booking.period
+            )
+
+        return True
+
     except Exception:
         session.rollback()
         raise

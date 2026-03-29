@@ -54,9 +54,9 @@ class CartView(QWidget):
         layout.addWidget(self.summary_label)
 
         self.table = QTableWidget()
-        self.table.setColumnCount(6)
+        self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels([
-            "Utánfutó", "Dátum", "Időszak", "Ár", "Művelet", ""
+            "Utánfutó", "Dátum", "Időszak", "Ár","Kaució", "Művelet", ""
         ])
 
         self.table.setStyleSheet("""
@@ -115,21 +115,25 @@ class CartView(QWidget):
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.Fixed)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(5, QHeaderView.Fixed)
+        header.setSectionResizeMode(6, QHeaderView.Fixed)
 
-        self.table.setColumnWidth(4, 110)
-        self.table.setColumnWidth(5, 10)
+        self.table.setColumnWidth(5, 110)
+        self.table.setColumnWidth(6, 10)
 
-        total = 0
+        total_price = 0
+        total_deposit = 0
 
         for row, item in enumerate(items):
-            total += item["price"]
+            total_price += item["price"]
+            total_deposit += item.get("deposit", 0)
 
             self.table.setItem(row, 0, QTableWidgetItem(item["trailer_name"]))
             self.table.setItem(row, 1, QTableWidgetItem(str(item["booking_date"])))
             self.table.setItem(row, 2, QTableWidgetItem(item["period_hu"]))
             self.table.setItem(row, 3, QTableWidgetItem(f'{item["price"]} Ft'))
+            self.table.setItem(row, 4, QTableWidgetItem(f'{item.get("deposit", 0)} Ft'))
 
             delete_btn = QPushButton("Törlés")
             delete_btn.setFixedHeight(32)
@@ -153,9 +157,16 @@ class CartView(QWidget):
                 lambda _, cid=item["id"]: self.remove_item(cid)
             )
 
-            self.table.setCellWidget(row, 4, delete_btn)
+            self.table.setCellWidget(row, 5, delete_btn)
 
-        self.summary_label.setText(f"Tételek száma: {len(items)} | Összesen: {total} Ft")
+        grand_total = total_price + total_deposit
+
+        self.summary_label.setText(
+            f"Tételek: {len(items)} | "
+            f"Bérlés: {total_price} Ft | "
+            f"Kaució: {total_deposit} Ft | "
+            f"Összesen: {grand_total} Ft"
+        )
 
     def remove_item(self, cart_item_id):
         user = SessionManager.instance().get_user()

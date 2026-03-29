@@ -8,7 +8,9 @@ from PySide6.QtCore import Qt, QDate
 
 from database import SessionLocal
 from models.booking import Booking
+from models.trailer import Trailer
 from core.toast import Toast
+from views.technical_booking_view import TechnicalBooking
 
 
 class BookingView(QWidget):
@@ -28,8 +30,27 @@ class BookingView(QWidget):
         title = QLabel("Foglalások")
         title.setStyleSheet("color: white; font-size: 18px; font-weight: bold;")
 
+        self.new_booking_btn = QPushButton("+ Új Technikai foglalás")
+        self.new_booking_btn.setCursor(Qt.PointingHandCursor)
+        self.new_booking_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #16a34a;
+                    color: white;
+                    border-radius: 8px;
+                    padding: 8px 14px;
+                    font-size: 13px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #15803d;
+                }
+                """)
+
+        self.new_booking_btn.clicked.connect(self.open_technical_booking)
+        
         toolbar.addWidget(title)
         toolbar.addStretch()
+        toolbar.addWidget(self.new_booking_btn)
 
         layout.addLayout(toolbar)
 
@@ -200,6 +221,16 @@ class BookingView(QWidget):
 
         session.close()
 
+    def open_technical_booking(self):
+            session = SessionLocal()
+            trailers = session.query(Trailer).all()
+            session.close()
+
+            dialog = TechnicalBooking(self.main_window, trailers)
+
+            if dialog.exec():
+                self.load_data()
+
     # ======================
     # TÖRLÉS
     # ======================
@@ -312,6 +343,7 @@ class BookingView(QWidget):
 
         dialog.setLayout(layout)
 
+
         # ===== MENTÉS =====
         def save():
             booking.booking_date = date_edit.date().toPython()
@@ -328,3 +360,5 @@ class BookingView(QWidget):
         cancel_btn.clicked.connect(dialog.reject)
 
         dialog.exec()
+
+        

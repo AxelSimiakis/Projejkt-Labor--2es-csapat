@@ -1,13 +1,15 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem,
-    QLabel, QHeaderView, QAbstractItemView
+    QLabel, QHeaderView, QAbstractItemView, QPushButton, QHBoxLayout
 )
 from PySide6.QtCore import Qt
 
 from database import SessionLocal
 from models.booking import Booking
 from core.session_manager import SessionManager
-
+from datetime import date, timedelta
+from services.booking_service import cancel_booking
+from core.toast import Toast
 
 PERIOD_TO_HU = {
     "morning": "Délelőtt",
@@ -35,9 +37,9 @@ class MyBookingsView(QWidget):
         layout.addWidget(title)
 
         self.table = QTableWidget()
-        self.table.setColumnCount(6)
+        self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels([
-            "Utánfutó", "Dátum", "Időszak", "Státusz", "Létrehozva", "Kaució"
+            "Utánfutó", "Dátum", "Időszak", "Státusz", "Létrehozva", "Kaució", "Művelet"
         ])
 
         self.table.setStyleSheet("""
@@ -104,13 +106,16 @@ class MyBookingsView(QWidget):
             header.setSectionResizeMode(3, QHeaderView.ResizeToContents)   # Státusz
             header.setSectionResizeMode(4, QHeaderView.ResizeToContents)   # Létrehozva
             header.setSectionResizeMode(5, QHeaderView.ResizeToContents)   # Kaució
+            header.setSectionResizeMode(6, QHeaderView.ResizeToContents)   
+
+            self.table.setColumnWidth(6, 220)
 
             for row, booking in enumerate(bookings):
                 trailer_name = booking.trailer.name if booking.trailer else f"#{booking.trailer_id}"
                 period_hu = PERIOD_TO_HU.get(booking.period, booking.period)
                 status_hu = STATUS_TO_HU.get(booking.status, booking.status)
                 created_at = str(booking.created_at)[:16] if booking.created_at else "-"
-                deposit = f"{booking.trailer.deposit} Ft" if booking.trailer else "-"
+                deposit = f"{booking.trailer.deposit or 0} Ft" if booking.trailer else "-"
 
                 self.table.setItem(row, 0, QTableWidgetItem(trailer_name))
                 self.table.setItem(row, 1, QTableWidgetItem(str(booking.booking_date)))
@@ -119,5 +124,61 @@ class MyBookingsView(QWidget):
                 self.table.setItem(row, 4, QTableWidgetItem(created_at))
                 self.table.setItem(row, 5, QTableWidgetItem(deposit))
 
+                cancel_btn = QPushButton("Lemondás")
+                cancel_btn.setFixedHeight(30)
+                cancel_btn.setMinimumWidth(140)
+                cancel_btn.setCursor(Qt.PointingHandCursor)
+                cancel_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #374151;
+                    color: white;
+                    border-radius: 6px;
+                    padding: 6px 12px;
+                    font-size: 13px;
+                }
+                QPushButton:hover {
+                    background-color: #4b5563;
+                }
+                """)
+
+                # 5 napos szabály
+                if booking.booking_date <= date.today() + timedelta(days=5):
+                    cancel_btn.setEnabled(False)
+                    cancel_btn.setText("Nem törölhető")
+
+                cancel_btn.clicked.connect(
+                    lambda _, bid=booking.id: self.handle_cancel(bid)
+                )
+
+                container = QWidget()
+                container.setAttribute(Qt.WA_StyledBackground, False)
+                container.setAutoFillBackground(False)
+                container.setStyleSheet("background: transparent;")
+
+                btn_layout = QHBoxLayout()
+                btn_layout.setContentsMargins(10, 5, 10, 5)
+                btn_layout.setSpacing(10)
+
+                btn_layout.addWidget(cancel_btn)
+
+                container.setLayout(btn_layout)
+                
+                self.table.setCellWidget(row, 6, cancel_btn)
+
         finally:
             session.close()
+    def handle_cancel(self, booking_id):
+        user = SessionManager.instance().get_user()
+
+        try:
+            cancel_booking(booking_id, user.id)
+
+            Toast(self.main_window, "Foglalás lemondva", True).show_toast()
+            self.load_data()
+
+        except ValueError as e:
+            Toast(self.main_window, str(e), False).show_toast()
+
+        except Exception as e:
+            Toast(self.main_window, "Hiba történt", False).show_toast()
+            print(e)

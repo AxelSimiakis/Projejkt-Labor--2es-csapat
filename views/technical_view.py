@@ -171,7 +171,7 @@ class TechnicalView(QWidget):
         header.setSectionResizeMode(2, QHeaderView.ResizeToContents)            # Délelőtt
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)            # Délután
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)            # Egésznap
-        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)            # Kaukció
+        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)            #  kció
         header.setSectionResizeMode(6, QHeaderView.Fixed)              # Művelet
 
         self.table.setColumnWidth(2, 300)

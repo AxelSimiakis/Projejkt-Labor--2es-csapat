@@ -89,6 +89,7 @@ def get_user_cart_items(user_id: int):
                 "booking_date": item.booking_date,
                 "period": period_int_to_str(item.period),
                 "period_hu": period_int_to_hu(item.period),
+                "deposit": item.trailer.deposit,
                 "price": (
                     item.trailer.price_morning if item.period == 0 else
                     item.trailer.price_afternoon if item.period == 1 else
@@ -168,16 +169,17 @@ def checkout_cart(user_id: int):
             price = 0
             if item.trailer:
                 if item.period == 0:
-                    price = item.trailer.price_morning
+                    price = item.trailer.price_morning or 0
                 elif item.period == 1:
-                    price = item.trailer.price_afternoon
+                    price = item.trailer.price_afternoon or 0
                 elif item.period == 2:
-                    price = item.trailer.price_full_day
+                    price = item.trailer.price_full_day or 0
 
             email_items.append({
                 "trailer_name": trailer_name,
                 "booking_date": item.booking_date,
                 "period": period_int_to_str(item.period),
+                "deposit": item.trailer.deposit if item.trailer else 0,
                 "price": price,
             })
 
