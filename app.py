@@ -17,6 +17,7 @@ from views.technical_view import TechnicalView
 from views.favorite_view import FavoriteView
 from views.cart_view import CartView
 from views.my_bookings_view import MyBookingsView
+from views.statistics_view import StatisticsView
 from core.session_manager import SessionManager
 from core.image_utils import create_round_avatar
 
@@ -59,6 +60,7 @@ class MainWindow(QMainWindow):
         self.favorite_page = FavoriteView(self)
         self.cart_page = CartView(self)
         self.my_bookings_page = MyBookingsView(self)
+        self.statistics_page = StatisticsView(self)
 
         self.stack.addWidget(self.home_page)
         self.stack.addWidget(self.login_page)
@@ -71,6 +73,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.favorite_page)
         self.stack.addWidget(self.cart_page)
         self.stack.addWidget(self.my_bookings_page)
+        self.stack.addWidget(self.statistics_page)
 
         self.main_layout.addWidget(self.stack)
 
@@ -149,6 +152,11 @@ class MainWindow(QMainWindow):
             self.technical_page.load_data()
         self.stack.setCurrentWidget(self.technical_page)
 
+    def open_statistics(self):
+        if hasattr(self.statistics_page, "refresh_data"):
+            self.statistics_page.refresh_data()
+        self.stack.setCurrentWidget(self.statistics_page)
+
     def update_navbar(self):
         while self.nav_layout.count():
             item = self.nav_layout.takeAt(0)
@@ -224,6 +232,10 @@ class MainWindow(QMainWindow):
             users_btn.clicked.connect(self.open_users)
             self.nav_layout.addWidget(users_btn)
 
+            statistics_btn = QPushButton("Statisztika")
+            statistics_btn.clicked.connect(self.open_statistics)
+            self.nav_layout.addWidget(statistics_btn)
+
         favorites_btn = QPushButton("Kedvencek")
         favorites_btn.clicked.connect(self.open_favorites)
         self.nav_layout.addWidget(favorites_btn)
@@ -255,6 +267,9 @@ class MainWindow(QMainWindow):
 
         if hasattr(self.my_bookings_page, "load_data"):
             self.my_bookings_page.load_data()
+
+        if hasattr(self.statistics_page, "refresh_data"):
+            self.statistics_page.refresh_data()
 
         self.update_navbar()
         self.go_to_home()

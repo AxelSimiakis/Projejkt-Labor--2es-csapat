@@ -1,7 +1,9 @@
 from database import SessionLocal
 from models.cart_item import CartItem
 from models.booking import Booking
+from models.user import User
 from services.booking_service import is_trailer_available
+from services.email_service import send_booking_confirmation_email
 
 
 PERIOD_TO_INT = {
@@ -78,7 +80,6 @@ def get_user_cart_items(user_id: int):
             .all()
         )
 
-        # fontos: előre kiolvassuk, hogy session.close() után is biztos működjön
         result = []
         for item in items:
             result.append({
@@ -143,17 +144,44 @@ def checkout_cart(user_id: int):
         if not items:
             raise ValueError("A kosár üres.")
 
-        # 1. validáció
+        user = session.query(User).filter_by(id=user_id).first()
+        if not user:
+            raise ValueError("A felhasználó nem található.")
+
+        # 1. Elérhetőség ellenőrzése
         for item in items:
             period = period_int_to_str(item.period)
             available = is_trailer_available(item.trailer_id, item.booking_date, period)
+
             if not available:
                 trailer_name = item.trailer.name if item.trailer else f"#{item.trailer_id}"
                 raise ValueError(
-                    f"A következő tétel már nem elérhető: {trailer_name} - {item.booking_date} - {period_int_to_hu(item.period)}"
+                    f"A következő tétel már nem elérhető: "
+                    f"{trailer_name} - {item.booking_date} - {period_int_to_hu(item.period)}"
                 )
 
-        # 2. bookingok létrehozása
+        # 2. Emailhez adatok összegyűjtése még commit előtt
+        email_items = []
+        for item in items:
+            trailer_name = item.trailer.name if item.trailer else f"#{item.trailer_id}"
+
+            price = 0
+            if item.trailer:
+                if item.period == 0:
+                    price = item.trailer.price_morning
+                elif item.period == 1:
+                    price = item.trailer.price_afternoon
+                elif item.period == 2:
+                    price = item.trailer.price_full_day
+
+            email_items.append({
+                "trailer_name": trailer_name,
+                "booking_date": item.booking_date,
+                "period": period_int_to_str(item.period),
+                "price": price,
+            })
+
+        # 3. Foglalások létrehozása
         for item in items:
             booking = Booking(
                 user_id=item.user_id,
@@ -164,12 +192,28 @@ def checkout_cart(user_id: int):
             )
             session.add(booking)
 
-        # 3. kosár ürítése
+        # 4. Kosár ürítése
         for item in items:
             session.delete(item)
 
         session.commit()
+
+        # 5. E-mail küldés commit után
+        try:
+            if user.email:
+                full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+                recipient_name = full_name if full_name else user.email
+
+                send_booking_confirmation_email(
+                    recipient_email=user.email,
+                    recipient_name=recipient_name,
+                    bookings=email_items
+                )
+        except Exception as email_error:
+            print(f"E-mail küldési hiba: {email_error}")
+
         return True
+
     except Exception:
         session.rollback()
         raise
