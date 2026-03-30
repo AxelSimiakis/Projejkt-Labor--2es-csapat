@@ -10,6 +10,7 @@ from models.user import User
 from passlib.hash import bcrypt
 from core.image_utils import create_round_avatar
 from core.toast import Toast
+from services.email_service import send_registration_email
 
 
 class RegisterView(QWidget):
@@ -146,39 +147,57 @@ class RegisterView(QWidget):
             Toast(self.main_window, "A jelszó megadása kötelező!", success=False).show_toast()
             return
 
+        plain_password = self.password.text().strip()
+
         session = SessionLocal()
 
-        # EMAIL ELLENŐRZÉS
-        existing_user = session.query(User).filter_by(
-            email=self.email.text().strip()
-        ).first()
+        try:
+            # EMAIL ELLENŐRZÉS
+            existing_user = session.query(User).filter_by(
+                email=self.email.text().strip()
+            ).first()
 
-        if existing_user:
-            Toast(self.main_window, "Az email már létezik!", success=False).show_toast()
-            session.close()
+            if existing_user:
+                Toast(self.main_window, "Az email már létezik!", success=False).show_toast()
+                return
+
+            # USER LÉTREHOZÁS
+            user = User(
+                first_name=self.first_name.text().strip(),
+                last_name=self.last_name.text().strip(),
+                email=self.email.text().strip(),
+                password_hash=bcrypt.hash(plain_password),
+                phone=self.phone.text().strip(),
+                country=self.country.text().strip(),
+                zip_code=self.zip_code.text().strip(),
+                city=self.city.text().strip(),
+                street=self.street.text().strip(),
+                house_number=self.house_number.text().strip(),
+                profile_image_path=self.avatar_path,
+                role="user"
+            )
+
+            session.add(user)
+            session.commit()
+
+        except Exception as e:
+            session.rollback()
+            Toast(self.main_window, f"Hiba regisztráció közben: {e}", success=False).show_toast()
             return
-
-        # USER LÉTREHOZÁS
-        user = User(
-            first_name=self.first_name.text().strip(),
-            last_name=self.last_name.text().strip(),
-            email=self.email.text().strip(),
-            password_hash=bcrypt.hash(self.password.text()),
-            phone=self.phone.text().strip(),
-            country=self.country.text().strip(),
-            zip_code=self.zip_code.text().strip(),
-            city=self.city.text().strip(),
-            street=self.street.text().strip(),
-            house_number=self.house_number.text().strip(),
-            profile_image_path=self.avatar_path,
-            role="user"
-        )
-
-        session.add(user)
-        session.commit()
-        session.close()
+        finally:
+            session.close()
 
         saved_email = self.email.text().strip()
+        full_name = f"{self.first_name.text().strip()} {self.last_name.text().strip()}".strip()
+
+        try:
+            send_registration_email(
+                email=saved_email,
+                name=full_name,
+                password=plain_password
+            )
+        except Exception as e:
+            print("EMAIL HIBA (regisztráció után):", e)
 
         Toast(self.main_window, "Sikeres regisztráció!", success=True).show_toast()
 

@@ -1,14 +1,11 @@
 import smtplib
 from email.message import EmailMessage
+from datetime import date
 
 
 # =========================================
 # SMTP BEÁLLÍTÁSOK
 # =========================================
-# Gmail: potkocsipont@gmail.com
-# Jelszo: Potkocsipont1234!!
-# App jelsó: yubb kiri xurd oixk    --> Kódban nem kell szóköz
-
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 SMTP_USER = "potkocsipont@gmail.com"
@@ -16,12 +13,17 @@ SMTP_PASSWORD = "yubbkirixurdoixk"
 SENDER_EMAIL = SMTP_USER
 
 
-
 PERIOD_TO_HU = {
     "morning": "Délelőtt",
     "afternoon": "Délután",
     "full_day": "Egész nap",
 }
+
+
+def _format_date(value):
+    if isinstance(value, date):
+        return value.strftime("%Y.%m.%d.")
+    return str(value)
 
 
 def send_booking_confirmation_email(
@@ -33,7 +35,6 @@ def send_booking_confirmation_email(
     total_deposit = sum(item.get("deposit", 0) for item in bookings)
     grand_total = total_price + total_deposit
 
-    # ===== SZÖVEGES VERZIÓ =====
     text_lines = []
     text_lines.append(f"Kedves {recipient_name}!")
     text_lines.append("")
@@ -59,7 +60,6 @@ def send_booking_confirmation_email(
 
     text_body = "\n".join(text_lines)
 
-    # ===== HTML TÁBLÁZAT SOROK =====
     rows_html = ""
     for item in bookings:
         rows_html += f"""
@@ -72,7 +72,6 @@ def send_booking_confirmation_email(
         </tr>
         """
 
-    # ===== HTML EMAIL =====
     html_body = f"""
     <html>
     <body style="margin:0;padding:0;background-color:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827;">
@@ -146,6 +145,7 @@ def send_booking_confirmation_email(
     except Exception as e:
         print("EMAIL HIBA:", e)
 
+
 def send_booking_cancellation_email(
     recipient_email: str,
     recipient_name: str,
@@ -153,11 +153,9 @@ def send_booking_cancellation_email(
     booking_date,
     period: str
 ):
-    from email.message import EmailMessage
-
     period_hu = PERIOD_TO_HU.get(period, period)
+    booking_date = _format_date(booking_date)
 
-    # ===== TEXT =====
     text_body = f"""
 Kedves {recipient_name}!
 
@@ -170,13 +168,11 @@ Időszak: {period_hu}
 PótkocsiPont
 """
 
-    # ===== HTML =====
     html_body = f"""
     <html>
     <body style="margin:0;padding:0;background-color:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827;">
         <div style="max-width:700px;margin:30px auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
 
-            <!-- 🔴 PIROS HEADER -->
             <div style="background:linear-gradient(90deg,#dc2626,#991b1b);padding:24px 30px;">
                 <h1 style="margin:0;color:white;font-size:24px;">PótkocsiPont</h1>
                 <p style="margin:8px 0 0 0;color:#fecaca;font-size:14px;">
@@ -255,9 +251,128 @@ PótkocsiPont
     except Exception as e:
         print("EMAIL HIBA (törlés):", e)
 
-def send_registration_email(email, name, password):
-    from email.message import EmailMessage
 
+def send_system_cancellation_email(
+    recipient_email: str,
+    recipient_name: str,
+    trailer_name: str,
+    booking_date,
+    period: str,
+    reason: str = "Az utánfutó átmenetileg nem elérhető."
+):
+    period_hu = PERIOD_TO_HU.get(period, period)
+    booking_date = _format_date(booking_date)
+
+    text_body = f"""
+Kedves {recipient_name}!
+
+Sajnálattal értesítjük, hogy az alábbi foglalását a rendszer automatikusan lemondta.
+
+Utánfutó: {trailer_name}
+Dátum: {booking_date}
+Időszak: {period_hu}
+
+Lemondás oka:
+{reason}
+
+Kérjük, szükség esetén válasszon másik időpontot vagy vegye fel velünk a kapcsolatot.
+
+Üdv,
+PótkocsiPont
+"""
+
+    html_body = f"""
+    <html>
+    <body style="margin:0;padding:0;background-color:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+        <div style="max-width:700px;margin:30px auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">
+
+            <div style="background:linear-gradient(90deg,#dc2626,#991b1b);padding:24px 30px;">
+                <h1 style="margin:0;color:white;font-size:24px;">PótkocsiPont</h1>
+                <p style="margin:8px 0 0 0;color:#fecaca;font-size:14px;">
+                    Automatikus foglalás lemondás
+                </p>
+            </div>
+
+            <div style="padding:30px;">
+                <p style="margin-top:0;font-size:16px;">
+                    Kedves <strong>{recipient_name}</strong>!
+                </p>
+
+                <p style="font-size:15px;line-height:1.6;color:#374151;">
+                    Sajnálattal értesítjük, hogy az alábbi foglalását a rendszer automatikusan lemondta.
+                </p>
+
+                <div style="margin:24px 0 10px 0;">
+                    <h2 style="margin:0;font-size:18px;color:#111827;">Lemondott foglalás</h2>
+                </div>
+
+                <table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:14px;">
+                    <tbody>
+                        <tr>
+                            <td style="padding:12px;border-bottom:1px solid #e5e7eb;">Utánfutó</td>
+                            <td style="padding:12px;border-bottom:1px solid #e5e7eb;"><strong>{trailer_name}</strong></td>
+                        </tr>
+                        <tr>
+                            <td style="padding:12px;border-bottom:1px solid #e5e7eb;">Dátum</td>
+                            <td style="padding:12px;border-bottom:1px solid #e5e7eb;">{booking_date}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:12px;border-bottom:1px solid #e5e7eb;">Időszak</td>
+                            <td style="padding:12px;border-bottom:1px solid #e5e7eb;">{period_hu}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div style="margin-top:24px;padding:18px;background:#fef2f2;border:1px solid #fecaca;border-radius:10px;">
+                    <p style="margin:0 0 8px 0;font-size:15px;color:#991b1b;">
+                        A foglalást a rendszer automatikusan lemondta.
+                    </p>
+                    <p style="margin:0;font-size:14px;color:#7f1d1d;">
+                        <strong>Ok:</strong> {reason}
+                    </p>
+                </div>
+
+                <p style="margin-top:24px;font-size:15px;line-height:1.6;color:#374151;">
+                    Kérjük, szükség esetén válasszon másik időpontot vagy vegye fel velünk a kapcsolatot.
+                </p>
+
+                <p style="margin-top:28px;font-size:15px;color:#374151;">
+                    Üdv,<br>
+                    <strong>PótkocsiPont</strong>
+                </p>
+            </div>
+
+            <div style="padding:16px 30px;background:#f9fafb;border-top:1px solid #e5e7eb;">
+                <p style="margin:0;font-size:12px;color:#6b7280;">
+                    Ez egy automatikusan generált email.
+                </p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    msg = EmailMessage()
+    msg["Subject"] = "Foglalás automatikusan lemondva - PótkocsiPont"
+    msg["From"] = SENDER_EMAIL
+    msg["To"] = recipient_email
+
+    msg.set_content(text_body)
+    msg.add_alternative(html_body, subtype="html")
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.send_message(msg)
+
+    except Exception as e:
+        print("EMAIL HIBA (automatikus törlés):", e)
+
+
+def send_registration_email(email, name, password):
     msg = EmailMessage()
     msg["Subject"] = "Sikeres regisztráció - PótkocsiPont"
     msg["From"] = SENDER_EMAIL

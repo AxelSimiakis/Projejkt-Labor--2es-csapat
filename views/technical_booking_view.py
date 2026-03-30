@@ -2,22 +2,31 @@ from PySide6.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QComboBox, QDateEdit, QGridLayout
 )
-from PySide6.QtCore import QDate, Qt
+from PySide6.QtCore import QDate
 
-from services.technical_booking_service import create_technical_booking
 from core.toast import Toast
+from services.staff_booking_service import create_staff_booking
+from services.technical_booking_service import create_technical_booking
 
 
-class TechnicalBooking(QDialog):
-    def __init__(self, main_window, trailers):
+PERIOD_LABELS = {
+    "morning": "Délelőtt",
+    "afternoon": "Délután",
+    "full_day": "Egész nap",
+}
+
+
+class ManagedBookingDialog(QDialog):
+    def __init__(self, main_window, trailers, booking_kind="technical"):
         super().__init__()
         self.main_window = main_window
         self.trailers = trailers
+        self.booking_kind = booking_kind
 
-        self.setWindowTitle("Technikai foglalás")
+        is_staff_booking = booking_kind == "employee"
+        self.setWindowTitle("Alkalmazotti foglalás" if is_staff_booking else "Technikai foglalás")
         self.setMinimumWidth(650)
 
-        # ===== STYLE =====
         self.setStyleSheet("""
         QDialog {
             background-color: #1f2937;
@@ -48,7 +57,6 @@ class TechnicalBooking(QDialog):
         }
         """)
 
-        # ===== MAIN =====
         main_layout = QVBoxLayout()
         container = QWidget()
         container_layout = QVBoxLayout()
@@ -59,12 +67,20 @@ class TechnicalBooking(QDialog):
         main_layout.addWidget(container)
         self.setLayout(main_layout)
 
-        # ===== TITLE =====
-        title = QLabel("Technikai foglalás")
+        title = QLabel("Alkalmazotti foglalás" if is_staff_booking else "Technikai foglalás")
         title.setStyleSheet("font-size:18px; font-weight:bold; color:white;")
         container_layout.addWidget(title)
 
-        # ===== INPUTOK =====
+        subtitle_text = (
+            "Utcáról érkező ügyfél foglalásának rögzítése dolgozó által."
+            if is_staff_booking else
+            "Szervizelés vagy belső kizárás miatt nem foglalható időszak rögzítése."
+        )
+        subtitle = QLabel(subtitle_text)
+        subtitle.setWordWrap(True)
+        subtitle.setStyleSheet("color:#9ca3af; font-size:12px;")
+        container_layout.addWidget(subtitle)
+
         self.first_name_input = QLineEdit()
         self.last_name_input = QLineEdit()
         self.phone_input = QLineEdit()
@@ -90,7 +106,6 @@ class TechnicalBooking(QDialog):
         self.street_input.setPlaceholderText("Utca")
         self.house_number_input.setPlaceholderText("Házszám")
 
-        # ===== FOGLALÁS =====
         self.trailer_combo = QComboBox()
         for t in trailers:
             self.trailer_combo.addItem(t.name, t.id)
@@ -98,11 +113,13 @@ class TechnicalBooking(QDialog):
         self.date_input = QDateEdit()
         self.date_input.setCalendarPopup(True)
         self.date_input.setDate(QDate.currentDate())
+        self.date_input.setMinimumDate(QDate.currentDate())
 
         self.period_combo = QComboBox()
-        self.period_combo.addItems(["morning", "afternoon", "full_day"])
+        self.period_combo.addItem(PERIOD_LABELS["morning"], "morning")
+        self.period_combo.addItem(PERIOD_LABELS["afternoon"], "afternoon")
+        self.period_combo.addItem(PERIOD_LABELS["full_day"], "full_day")
 
-        # ===== GRID (2 OSZLOP) =====
         grid = QGridLayout()
         grid.setSpacing(10)
 
@@ -110,7 +127,6 @@ class TechnicalBooking(QDialog):
             grid.addWidget(QLabel(label), row, col)
             grid.addWidget(widget, row, col + 1)
 
-        # BAL OSZLOP
         add(0, 0, "Vezetéknév", self.first_name_input)
         add(1, 0, "Keresztnév", self.last_name_input)
         add(2, 0, "Telefon", self.phone_input)
@@ -118,7 +134,6 @@ class TechnicalBooking(QDialog):
         add(4, 0, "Jelszó", self.password_input)
         add(5, 0, "Ország", self.country_input)
 
-        # JOBB OSZLOP
         add(0, 2, "Város", self.city_input)
         add(1, 2, "Utca", self.street_input)
         add(2, 2, "Házszám", self.house_number_input)
@@ -129,10 +144,8 @@ class TechnicalBooking(QDialog):
 
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
-
         container_layout.addLayout(grid)
 
-        # ===== GOMBOK =====
         btn_layout = QHBoxLayout()
 
         save_btn = QPushButton("Mentés")
@@ -162,34 +175,48 @@ class TechnicalBooking(QDialog):
 
         btn_layout.addWidget(save_btn)
         btn_layout.addWidget(cancel_btn)
-
         container_layout.addLayout(btn_layout)
 
-    # ===== SAVE =====
     def handle_save(self):
         try:
-            create_technical_booking(
-                first_name=self.first_name_input.text(),
-                last_name=self.last_name_input.text(),
-                phone=self.phone_input.text(),
-                email=self.email_input.text(),
-                password=self.password_input.text(),
-                country=self.country_input.text(),
-                zip_code=self.zip_input.text(),
-                city=self.city_input.text(),
-                street=self.street_input.text(),
-                house_number=self.house_number_input.text(),
+            payload = dict(
+                first_name=self.first_name_input.text().strip(),
+                last_name=self.last_name_input.text().strip(),
+                phone=self.phone_input.text().strip(),
+                email=self.email_input.text().strip(),
+                password=self.password_input.text().strip(),
+                country=self.country_input.text().strip(),
+                zip_code=self.zip_input.text().strip(),
+                city=self.city_input.text().strip(),
+                street=self.street_input.text().strip(),
+                house_number=self.house_number_input.text().strip(),
                 trailer_id=self.trailer_combo.currentData(),
                 booking_date=self.date_input.date().toPython(),
-                period=self.period_combo.currentText()
+                period=self.period_combo.currentData(),
             )
 
-            Toast(self.main_window, "Foglalás sikeres", True).show_toast()
+            if self.booking_kind == "employee":
+                create_staff_booking(**payload)
+                success_message = "Alkalmazotti foglalás sikeresen létrehozva"
+            else:
+                create_technical_booking(**payload)
+                success_message = "Technikai foglalás sikeresen létrehozva"
+
+            Toast(self.main_window, success_message, True).show_toast()
             self.accept()
 
         except ValueError as e:
             Toast(self.main_window, str(e), False).show_toast()
-
         except Exception as e:
             Toast(self.main_window, "Hiba történt", False).show_toast()
             print(e)
+
+
+class TechnicalBooking(ManagedBookingDialog):
+    def __init__(self, main_window, trailers):
+        super().__init__(main_window, trailers, booking_kind="technical")
+
+
+class EmployeeBooking(ManagedBookingDialog):
+    def __init__(self, main_window, trailers):
+        super().__init__(main_window, trailers, booking_kind="employee")

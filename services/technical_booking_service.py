@@ -14,6 +14,8 @@ def create_technical_booking(
 ):
     session = SessionLocal()
     try:
+        new_user_created = False
+
         if not all([first_name, last_name, email, phone]):
             raise ValueError("Minden kötelező mezőt tölts ki!")
 
@@ -46,7 +48,9 @@ def create_technical_booking(
             trailer_id=trailer_id,
             booking_date=booking_date,
             period=period,
-            status="technical"
+            status="technical",
+            name="Technikai foglalás",
+            phone=phone,
         )
 
         session.add(booking)

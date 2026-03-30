@@ -22,7 +22,7 @@ class Booking(Base):
     # elfogadott értékek: morning / afternoon / full_day
 
     status = Column(String, nullable=False, default="active")
-    # active / completed / cancelled / technical
+    # active / employee / completed / cancelled / technical
 
     created_at = Column(DateTime, default=datetime.utcnow)
 

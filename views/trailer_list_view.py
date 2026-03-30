@@ -14,12 +14,12 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QGridLayout,
     QCalendarWidget,
+    QGraphicsOpacityEffect,
 )
 
 from core.session_manager import SessionManager
 from core.toast import Toast
 from services.booking_service import (
-    create_booking,
     get_availability_for_trailer_and_date,
     get_availability_map_for_period,
 )
@@ -29,6 +29,13 @@ from services.favorite_service import (
 )
 from services.cart_service import add_to_cart
 from viewmodels.trailer_list_vm import TrailerListViewModel
+
+
+STATUS_TO_HU = {
+    "available": "Elérhető",
+    "service": "Szerviz alatt",
+    "inactive": "Üzemen kívüli",
+}
 
 
 class AvailabilityCalendar(QCalendarWidget):
@@ -92,13 +99,13 @@ class AvailabilityCalendar(QCalendarWidget):
         if py_date <= today:
             painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#6b7280"))
         else:
-                if state == "full":
-                    painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#dc2626"))
-                elif state == "partial":
-                    painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#f59e0b"))
-                else:
-                    painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#16a34a"))
-            
+            if state == "free":
+                painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#16a34a"))
+            elif state == "partial":
+                painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#f59e0b"))
+            elif state == "full":
+                painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#ef4444"))    
+
         if qdate == self.selectedDate():
             pen = QPen(QColor("#ffffff"))
             pen.setWidth(2)
@@ -119,7 +126,9 @@ class TrailerCard(QFrame):
         self.favorite_callback = favorite_callback
         self._is_favorite = is_favorite
 
+        self.is_blocked = getattr(trailer, "status", "available") in ["service", "inactive"]
         self.setCursor(Qt.PointingHandCursor)
+
         self.setObjectName("trailerCard")
         self.setStyleSheet("""
             QFrame#trailerCard {
@@ -175,7 +184,42 @@ class TrailerCard(QFrame):
             background: transparent;
         """)
 
+        status = getattr(trailer, "status", "available")
+        status_hu = STATUS_TO_HU.get(status, "Elérhető")
+
+        if status == "available":
+            self.status_badge = QLabel("Elérhető")
+            self.status_badge.setStyleSheet("""
+                background-color: #16a34a;
+                color: white;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 6px 10px;
+                border-radius: 8px;
+            """)
+        elif status == "service":
+            self.status_badge = QLabel("Szerviz alatt")
+            self.status_badge.setStyleSheet("""
+                background-color: #f59e0b;
+                color: white;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 6px 10px;
+                border-radius: 8px;
+            """)
+        else:
+            self.status_badge = QLabel("Üzemen kívüli")
+            self.status_badge.setStyleSheet("""
+                background-color: #ef4444;
+                color: white;
+                font-size: 11px;
+                font-weight: bold;
+                padding: 6px 10px;
+                border-radius: 8px;
+            """)
+
         self.price_label = QLabel(
+            f"Státusz: {status_hu}\n"
             f"Délelőtt: {trailer.price_morning} Ft\n"
             f"Délután: {trailer.price_afternoon} Ft\n"
             f"Egész nap: {trailer.price_full_day} Ft"
@@ -185,6 +229,28 @@ class TrailerCard(QFrame):
             font-size: 12px;
             background: transparent;
         """)
+
+        if self.is_blocked:
+            self.name_label.setStyleSheet("""
+                color: #cbd5e1;
+                font-size: 16px;
+                font-weight: bold;
+                background: transparent;
+            """)
+            self.desc_label.setStyleSheet("""
+                color: #94a3b8;
+                font-size: 12px;
+                background: transparent;
+            """)
+            self.price_label.setStyleSheet("""
+                color: #cbd5e1;
+                font-size: 12px;
+                background: transparent;
+            """)
+
+        top_row = QHBoxLayout()
+        top_row.addStretch()
+        top_row.addWidget(self.status_badge)
 
         bottom_row = QHBoxLayout()
         bottom_row.addStretch()
@@ -210,11 +276,38 @@ class TrailerCard(QFrame):
 
         self.update_favorite_icon()
 
+        layout.addLayout(top_row)
         layout.addWidget(self.image_label)
         layout.addWidget(self.name_label)
         layout.addWidget(self.desc_label)
         layout.addWidget(self.price_label)
         layout.addLayout(bottom_row)
+
+        self.block_overlay = QLabel(self)
+        self.block_overlay.setAlignment(Qt.AlignCenter)
+        self.block_overlay.setWordWrap(True)
+        self.block_overlay.hide()
+        self.block_overlay.setStyleSheet("""
+            background-color: rgba(17, 24, 39, 175);
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 14px;
+            padding: 20px;
+        """)
+
+        if status == "service":
+            self.block_overlay.setText("SZERVIZ\nALATT")
+            self.block_overlay.show()
+            self.block_overlay.raise_()
+        elif status == "inactive":
+            self.block_overlay.setText("NEM\nELÉRHETŐ")
+            self.block_overlay.show()
+            self.block_overlay.raise_()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.block_overlay.setGeometry(self.rect())
 
     def set_favorite(self, is_favorite: bool):
         self._is_favorite = is_favorite
@@ -288,6 +381,19 @@ class TrailerListView(QWidget):
         """)
         self.right_panel.setMinimumWidth(430)
 
+        self.right_overlay = QLabel(self.right_panel)
+        self.right_overlay.setAlignment(Qt.AlignCenter)
+        self.right_overlay.setWordWrap(True)
+        self.right_overlay.hide()
+        self.right_overlay.setStyleSheet("""
+            background-color: rgba(17, 24, 39, 210);
+            color: white;
+            font-size: 30px;
+            font-weight: bold;
+            border-radius: 16px;
+            padding: 24px;
+        """)
+
         right_layout = QVBoxLayout(self.right_panel)
         right_layout.setContentsMargins(18, 18, 18, 18)
         right_layout.setSpacing(8)
@@ -312,6 +418,11 @@ class TrailerListView(QWidget):
         self.description_label.setWordWrap(True)
         self.description_label.setStyleSheet("color: #d1d5db; font-size: 14px;")
         right_layout.addWidget(self.description_label)
+
+        self.status_label = QLabel("-")
+        self.status_label.setWordWrap(True)
+        self.status_label.setStyleSheet("color: white; font-size: 14px;")
+        right_layout.addWidget(self.status_label)
 
         self.price_label = QLabel("-")
         self.price_label.setStyleSheet("color: white; font-size: 14px;")
@@ -405,6 +516,15 @@ class TrailerListView(QWidget):
 
         self.load_trailers()
         self.refresh_auth_state()
+        self.update_right_overlay_geometry()
+
+    def update_right_overlay_geometry(self):
+        self.right_overlay.setGeometry(0, 0, self.right_panel.width(), self.right_panel.height())
+        self.right_overlay.raise_()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.update_right_overlay_geometry()
 
     def clear_layout(self, layout):
         while layout.count():
@@ -448,6 +568,7 @@ class TrailerListView(QWidget):
             self.selected_trailer = None
             self.name_label.setText("Nincs elérhető utánfutó")
             self.description_label.setText("A listában jelenleg nincs aktív utánfutó.")
+            self.status_label.setText("-")
             self.price_label.setText("-")
             self.image_label.setPixmap(QPixmap())
             self.image_label.setText("Nincs kép")
@@ -458,6 +579,7 @@ class TrailerListView(QWidget):
     def refresh(self):
         self.load_trailers()
         self.refresh_auth_state()
+        self.update_right_overlay_geometry()
 
     def refresh_auth_state(self):
         is_logged_in = SessionManager.instance().is_authenticated()
@@ -480,10 +602,84 @@ class TrailerListView(QWidget):
         else:
             self.favorite_action_button.setText("☆ Kedvenc")
 
+    def set_right_panel_blocked(self, blocked: bool, overlay_text: str = ""):
+        widgets = [
+            self.image_label,
+            self.name_label,
+            self.description_label,
+            self.status_label,
+            self.price_label,
+            self.calendar,
+            self.selected_date_label,
+            self.availability_morning,
+            self.availability_afternoon,
+            self.availability_full_day,
+            self.period_combo,
+        ]
+
+        if blocked:
+            for widget in widgets:
+                effect = QGraphicsOpacityEffect()
+                effect.setOpacity(0.35)
+                widget.setGraphicsEffect(effect)
+
+            self.book_button.setEnabled(False)
+            self.book_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4b5563;
+                    color: #d1d5db;
+                    padding: 10px;
+                    border: none;
+                    border-radius: 10px;
+                    font-weight: bold;
+                }
+            """)
+            self.right_overlay.setText(overlay_text)
+            self.right_overlay.show()
+            self.update_right_overlay_geometry()
+            self.right_overlay.raise_()
+        else:
+            for widget in widgets:
+                widget.setGraphicsEffect(None)
+
+            self.book_button.setEnabled(True)
+            self.book_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #16a34a;
+                    color: white;
+                    padding: 10px;
+                    border: none;
+                    border-radius: 10px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #15803d;
+                }
+            """)
+            self.right_overlay.hide()
+
     def select_trailer(self, trailer):
         self.selected_trailer = trailer
         self.name_label.setText(trailer.name)
         self.description_label.setText(trailer.description or "Nincs leírás.")
+
+        status = getattr(trailer, "status", "available")
+
+        if status == "available":
+            self.status_label.setText("Állapot: Elérhető")
+            self.status_label.setStyleSheet("color: #22c55e; font-size: 14px; font-weight: bold;")
+            self.set_right_panel_blocked(False)
+
+        elif status == "service":
+            self.status_label.setText("Állapot: Szerviz alatt")
+            self.status_label.setStyleSheet("color: #f59e0b; font-size: 14px; font-weight: bold;")
+            self.set_right_panel_blocked(True, "SZERVIZ ALATT")
+
+        else:
+            self.status_label.setText("Állapot: Üzemen kívüli")
+            self.status_label.setStyleSheet("color: #ef4444; font-size: 14px; font-weight: bold;")
+            self.set_right_panel_blocked(True, "NEM ELÉRHETŐ")
+
         self.price_label.setText(
             f"Délelőtt: {trailer.price_morning} Ft | "
             f"Délután: {trailer.price_afternoon} Ft | "
@@ -501,6 +697,7 @@ class TrailerListView(QWidget):
 
         self.refresh_calendar_month(selected_qdate.year(), selected_qdate.month())
         self.refresh_day_availability()
+        self.update_right_overlay_geometry()
 
     def load_trailer_image(self, image_path):
         if not image_path:
@@ -557,8 +754,10 @@ class TrailerListView(QWidget):
             self.clear_availability_labels()
             return
 
-        booking_date = self.get_selected_booking_date()
-        availability = get_availability_for_trailer_and_date(self.selected_trailer.id, booking_date)
+        availability = get_availability_for_trailer_and_date(
+            self.selected_trailer.id,
+            self.get_selected_booking_date()
+        )
 
         self.availability_morning.setText(
             f"Délelőtt: {'Szabad' if availability['morning'] else 'Foglalt'}"
@@ -607,6 +806,23 @@ class TrailerListView(QWidget):
     def book_selected_trailer(self):
         if self.selected_trailer is None:
             Toast(self.main_window or self, "Először válassz utánfutót.", success=False).show_toast()
+            return
+
+        status = getattr(self.selected_trailer, "status", "available")
+        if status == "service":
+            Toast(
+                self.main_window or self,
+                "Az utánfutó jelenleg szerviz alatt van, ezért nem foglalható.",
+                success=False
+            ).show_toast()
+            return
+
+        if status == "inactive":
+            Toast(
+                self.main_window or self,
+                "Az utánfutó jelenleg üzemen kívüli, ezért nem foglalható.",
+                success=False
+            ).show_toast()
             return
 
         user = SessionManager.instance().get_user()

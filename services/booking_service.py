@@ -2,14 +2,12 @@ from datetime import date, timedelta
 
 from database import SessionLocal
 from models.booking import Booking
-from models.user import User
-from services.email_service import send_booking_cancellation_email
-
+from models.trailer import Trailer
 
 FULL_DAY = "full_day"
 MORNING = "morning"
 AFTERNOON = "afternoon"
-ACTIVE_STATUSES = ["active", "technical"]
+ACTIVE_STATUSES = ["active", "employee", "technical"]
 
 
 def _normalize_period(period: str) -> str:
@@ -17,6 +15,7 @@ def _normalize_period(period: str) -> str:
         raise ValueError("Az időszak megadása kötelező.")
 
     normalized = period.strip().lower()
+
     if normalized == "fullday":
         normalized = FULL_DAY
 
@@ -59,7 +58,43 @@ def get_bookings_for_trailer_between_dates(trailer_id: int, start_date: date, en
         session.close()
 
 
+def get_trailer_status(trailer_id: int):
+    session = SessionLocal()
+    try:
+        trailer = session.query(Trailer).filter(Trailer.id == trailer_id).first()
+        if not trailer:
+            return None
+        return trailer.status
+    finally:
+        session.close()
+
+
+def is_trailer_bookable(trailer_id: int) -> bool:
+    session = SessionLocal()
+    try:
+        trailer = session.query(Trailer).filter(Trailer.id == trailer_id).first()
+        if not trailer:
+            return False
+
+        if not trailer.is_active:
+            return False
+
+        if trailer.status in ["service", "inactive"]:
+            return False
+
+        return True
+    finally:
+        session.close()
+
+
 def get_availability_for_trailer_and_date(trailer_id: int, booking_date: date) -> dict:
+    if not is_trailer_bookable(trailer_id):
+        return {
+            MORNING: False,
+            AFTERNOON: False,
+            FULL_DAY: False,
+        }
+
     bookings = get_bookings_for_trailer_and_date(trailer_id, booking_date)
 
     availability = {
@@ -89,12 +124,14 @@ def get_availability_for_trailer_and_date(trailer_id: int, booking_date: date) -
 
 
 def get_availability_map_for_period(trailer_id: int, start_date: date, end_date: date) -> dict:
-    """
-    Visszatérés:
-    {
-        date(2026, 3, 18): "free" | "partial" | "full"
-    }
-    """
+    if not is_trailer_bookable(trailer_id):
+        result = {}
+        current = start_date
+        while current <= end_date:
+            result[current] = "full"
+            current += timedelta(days=1)
+        return result
+
     bookings = get_bookings_for_trailer_between_dates(trailer_id, start_date, end_date)
 
     grouped = {}
@@ -109,7 +146,6 @@ def get_availability_map_for_period(trailer_id: int, start_date: date, end_date:
         if FULL_DAY in periods:
             result[current] = "full"
         elif MORNING in periods or AFTERNOON in periods:
-            # ha legalább egyik félnap foglalt
             if MORNING in periods and AFTERNOON in periods:
                 result[current] = "full"
             else:
@@ -117,7 +153,6 @@ def get_availability_map_for_period(trailer_id: int, start_date: date, end_date:
         else:
             result[current] = "free"
 
-        from datetime import timedelta
         current += timedelta(days=1)
 
     return result
@@ -134,6 +169,20 @@ def create_booking(user_id: int, trailer_id: int, booking_date: date, period: st
 
     session = SessionLocal()
     try:
+        trailer = session.query(Trailer).filter(Trailer.id == trailer_id).first()
+
+        if not trailer:
+            raise ValueError("Az utánfutó nem található.")
+
+        if not trailer.is_active:
+            raise ValueError("Az utánfutó inaktív.")
+
+        if trailer.status == "service":
+            raise ValueError("Az utánfutó jelenleg szerviz alatt van, ezért nem foglalható.")
+
+        if trailer.status == "inactive":
+            raise ValueError("Az utánfutó jelenleg üzemen kívüli, ezért nem foglalható.")
+
         if status == "active" and not is_trailer_available(trailer_id, booking_date, normalized_period):
             raise ValueError("Az utánfutó a kiválasztott időpontra már nem elérhető.")
 
@@ -149,44 +198,40 @@ def create_booking(user_id: int, trailer_id: int, booking_date: date, period: st
         session.commit()
         session.refresh(booking)
         return booking
+
     except Exception:
         session.rollback()
         raise
+
     finally:
         session.close()
 
-def cancel_booking(booking_id: int, user_id: int):
+
+def cancel_booking(booking_id: int, user_id: int = None, is_admin: bool = False):
     session = SessionLocal()
     try:
-        booking = session.query(Booking).filter_by(id=booking_id, user_id=user_id).first()
+        booking = session.query(Booking).filter(Booking.id == booking_id).first()
 
         if not booking:
-            raise ValueError("Foglalás nem található.")
+            raise ValueError("A foglalás nem található.")
 
-        today = date.today()
+        if booking.status == "cancelled":
+            raise ValueError("A foglalás már törölve van.")
 
-        # ❌ ha 5 napon belül van
-        if booking.booking_date <= today + timedelta(days=5):
-            raise ValueError("A foglalás már nem mondható le (5 napon belül).")
+        if not is_admin:
+            if user_id is None or booking.user_id != user_id:
+                raise ValueError("Nincs jogosultságod a foglalás törléséhez.")
 
-        # adatok emailhez
-        trailer_name = booking.trailer.name if booking.trailer else f"#{booking.trailer_id}"
+            today = date.today()
+            days_left = (booking.booking_date - today).days
 
-        session.delete(booking)
+            if days_left < 5:
+                raise ValueError("Az utolsó 5 napban a foglalás már nem törölhető.")
+
+        booking.status = "cancelled"
         session.commit()
-
-        # email
-        user = session.query(User).filter_by(id=user_id).first()
-        if user and user.email:
-            send_booking_cancellation_email(
-                recipient_email=user.email,
-                recipient_name=user.first_name or user.email,
-                trailer_name=trailer_name,
-                booking_date=booking.booking_date,
-                period=booking.period
-            )
-
-        return True
+        session.refresh(booking)
+        return booking
 
     except Exception:
         session.rollback()

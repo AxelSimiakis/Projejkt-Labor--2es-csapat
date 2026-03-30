@@ -116,7 +116,7 @@ class MainWindow(QMainWindow):
             background: transparent;
             border: none;
             color: white;
-            font-size: 16px;
+            font-size: 20px;
         }
 
         QPushButton:hover {

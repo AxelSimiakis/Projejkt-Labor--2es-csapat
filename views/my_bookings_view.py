@@ -19,6 +19,7 @@ PERIOD_TO_HU = {
 
 STATUS_TO_HU = {
     "active": "Aktív",
+    "employee": "Alkalmazotti",
     "completed": "Lezárt",
     "cancelled": "Törölt",
     "technical": "Technikai",

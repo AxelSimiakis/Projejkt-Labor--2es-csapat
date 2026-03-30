@@ -43,7 +43,7 @@ def run():
             city="Budapest",
             street="Fő utca",
             house_number="1",
-            profile_image_path="assets/IMG_6764.png",
+            profile_image_path="assets/gyors_atvetel.png",
             role="admin",
             created_at=datetime.now(UTC),
         )
